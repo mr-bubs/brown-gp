@@ -28,15 +28,14 @@ with col2:
 animated_view = st.checkbox("Race View (MP4 Video Player)")
 
 if animated_view:
-    # Now it controls the actual frame rate of the exported video!
     fps = st.slider("Playback Speed (Laps per second)", min_value=1, max_value=5, value=2, step=1)
-    button_text = "Bake & Play Video ▶️"
+    # --- UI UPDATE 1: New Button Text ---
+    button_text = "Simulate race"
 else:
     button_text = "Generate Static Tower"
 
 if st.button(button_text):
     
-    # Grab colors early
     session = fastf1.get_session(YEAR, TRACK, 'R')
     
     with st.spinner(f"Pulling telemetry for {TRACK} {YEAR}..."):
@@ -54,92 +53,98 @@ if st.button(button_text):
     # 🎬 MODE 1: THE VIDEO BAKER (CACHED MP4)
     # ==========================================
     if animated_view:
-        # Create a safe filename with the year, track, and speed
         safe_track_name = TRACK.replace(" ", "_")
         video_filename = f"f1cache/{YEAR}_{safe_track_name}_{fps}fps.mp4"
         
-        # THE CACHE CHECK: Does this video already exist?
         if os.path.exists(video_filename):
-            st.success("✅ Video loaded from cache instantly!")
+            st.success("✅ Simulation loaded from cache instantly!")
             st.video(video_filename)
             
         else:
-            with st.spinner("Baking the MP4 Video! This takes about 1-2 minutes, but will load instantly next time..."):
-                laps = session.laps
-                total_laps = int(laps['LapNumber'].max())
+            # --- UI UPDATE 2: The Streamlit Progress Bar ---
+            progress_text = "Simulating race..."
+            sim_progress = st.progress(0, text=progress_text)
+            
+            laps = session.laps
+            total_laps = int(laps['LapNumber'].max())
+            
+            frames_data = []
+            for current_lap in range(1, total_laps + 1):
+                lap_data = laps[laps['LapNumber'] == current_lap].dropna(subset=['Time'])
+                if lap_data.empty: continue
+                    
+                lap_data = lap_data.sort_values(by='Time')
+                leader_time = lap_data.iloc[0]['Time'].total_seconds()
                 
-                # Step A: Pre-calculate all the data frames so Matplotlib doesn't lag
-                frames_data = []
-                for current_lap in range(1, total_laps + 1):
-                    lap_data = laps[laps['LapNumber'] == current_lap].dropna(subset=['Time'])
-                    if lap_data.empty: continue
-                        
-                    lap_data = lap_data.sort_values(by='Time')
-                    leader_time = lap_data.iloc[0]['Time'].total_seconds()
-                    
-                    driver_times = []
-                    for index, row in lap_data.iterrows():
-                        name = row['Driver']
-                        time_behind = row['Time'].total_seconds() - leader_time
-                        driver_times.append({
-                            "name": f"{name} (+{time_behind:.1f}s)" if time_behind > 0 else name,
-                            "time_behind_leader": time_behind,
-                            "color": colors.get(name, 'mediumpurple'),
-                            "position": len(driver_times) + 1
-                        })
-                    
-                    if not driver_times: continue
-                    p_last_time = driver_times[-1]["time_behind_leader"]
-                    
-                    positions, accumulated_gaps, accumulated_colors, driver_positions = [], [], [], []
-                    for driver in reversed(driver_times):
-                        positions.append(driver["name"])
-                        accumulated_gaps.append(p_last_time - driver["time_behind_leader"])
-                        accumulated_colors.append(driver["color"])
-                        driver_positions.append(driver["position"])
-                        
-                    frames_data.append({
-                        'lap': current_lap,
-                        'positions': positions,
-                        'gaps': accumulated_gaps,
-                        'colors': accumulated_colors,
-                        'driver_pos': driver_positions
+                driver_times = []
+                for index, row in lap_data.iterrows():
+                    name = row['Driver']
+                    time_behind = row['Time'].total_seconds() - leader_time
+                    driver_times.append({
+                        "name": f"{name} (+{time_behind:.1f}s)" if time_behind > 0 else name,
+                        "time_behind_leader": time_behind,
+                        "color": colors.get(name, 'mediumpurple'),
+                        "position": len(driver_times) + 1
                     })
-
-                # Step B: Set up the Matplotlib Figure
-                fig, ax = plt.subplots(figsize=(5, 8))
                 
-                # Step C: The Animation Function that draws each frame
-                def update(frame_idx):
-                    ax.clear()
-                    data = frames_data[frame_idx]
-                    
-                    max_y_center = data['gaps'][-1] if data['gaps'] else 10
-                    ax.bar(x=0, bottom=0, height=max_y_center, width=0.3, color='darkgrey', zorder=1)
-                    
-                    for i in range(len(data['positions'])):
-                        ax.bar(x=0, bottom=data['gaps'][i] - 0.3, height=0.6, width=0.3, color=data['colors'][i], edgecolor='black', zorder=2)
-                        if data['driver_pos'][i] % 2 != 0:
-                            ax.text(0.25, data['gaps'][i], data['positions'][i], va='center', ha='left', fontweight='bold')
-                        else:
-                            ax.text(-0.25, data['gaps'][i], data['positions'][i], va='center', ha='right', fontweight='bold')
-
-                    ax.set_title(f"{TRACK} {YEAR} - Lap {data['lap']} / {total_laps}")
-                    ax.set_ylabel("Seconds Ahead of Last Place")
-                    ax.set_xticks([])
-                    ax.set_xlim(-2.5, 2.5)
-                    ax.spines['top'].set_visible(False)
-                    ax.spines['right'].set_visible(False)
-                    ax.spines['bottom'].set_visible(False)
-
-                # Step D: Bake the Video!
-                ani = animation.FuncAnimation(fig, update, frames=len(frames_data), blit=False)
-                ani.save(video_filename, writer='ffmpeg', fps=fps, dpi=150)
-                plt.close(fig)
+                if not driver_times: continue
+                p_last_time = driver_times[-1]["time_behind_leader"]
                 
-                # Render the final baked video to the screen
-                st.success("🏁 Video baked and cached successfully!")
-                st.video(video_filename)
+                positions, accumulated_gaps, accumulated_colors, driver_positions = [], [], [], []
+                for driver in reversed(driver_times):
+                    positions.append(driver["name"])
+                    accumulated_gaps.append(p_last_time - driver["time_behind_leader"])
+                    accumulated_colors.append(driver["color"])
+                    driver_positions.append(driver["position"])
+                    
+                frames_data.append({
+                    'lap': current_lap,
+                    'positions': positions,
+                    'gaps': accumulated_gaps,
+                    'colors': accumulated_colors,
+                    'driver_pos': driver_positions
+                })
+
+            fig, ax = plt.subplots(figsize=(5, 8))
+            
+            def update(frame_idx):
+                ax.clear()
+                data = frames_data[frame_idx]
+                
+                max_y_center = data['gaps'][-1] if data['gaps'] else 10
+                ax.bar(x=0, bottom=0, height=max_y_center, width=0.3, color='darkgrey', zorder=1)
+                
+                for i in range(len(data['positions'])):
+                    ax.bar(x=0, bottom=data['gaps'][i] - 0.3, height=0.6, width=0.3, color=data['colors'][i], edgecolor='black', zorder=2)
+                    if data['driver_pos'][i] % 2 != 0:
+                        ax.text(0.25, data['gaps'][i], data['positions'][i], va='center', ha='left', fontweight='bold')
+                    else:
+                        ax.text(-0.25, data['gaps'][i], data['positions'][i], va='center', ha='right', fontweight='bold')
+
+                ax.set_title(f"{TRACK} {YEAR} - Lap {data['lap']} / {total_laps}")
+                ax.set_ylabel("Seconds Ahead of Last Place")
+                ax.set_xticks([])
+                ax.set_xlim(-2.5, 2.5)
+                ax.spines['top'].set_visible(False)
+                ax.spines['right'].set_visible(False)
+                ax.spines['bottom'].set_visible(False)
+
+            # --- UI UPDATE 3: The Matplotlib Callback ---
+            # This function runs every time Matplotlib finishes a frame
+            def update_progress(current_frame, total_frames):
+                pct = min((current_frame + 1) / total_frames, 1.0)
+                sim_progress.progress(pct, text=f"{progress_text} ({int(pct * 100)}%)")
+
+            ani = animation.FuncAnimation(fig, update, frames=len(frames_data), blit=False)
+            
+            # We pass our progress function into Matplotlib's save command
+            ani.save(video_filename, writer='ffmpeg', fps=fps, dpi=150, progress_callback=update_progress)
+            plt.close(fig)
+            
+            # Clear the progress bar and show the video
+            sim_progress.empty()
+            st.success("🏁 Simulation complete!")
+            st.video(video_filename)
 
     # ==========================================
     # 📊 MODE 2: THE STATIC FINAL CLASSIFICATION
