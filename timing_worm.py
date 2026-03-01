@@ -5,33 +5,36 @@ import pandas as pd
 import re
 import os
 
-# --- 1. STREAMLIT UI SETUP ---
-st.title("F1 Timing Tower Builder 🏎️")
+# --- 1. SETUP & CACHE ---
+# Moved to the top so it speeds up our dynamic track list!
+if not os.path.exists('f1cache'):
+    os.makedirs('f1cache')
+fastf1.Cache.enable_cache('f1cache')
+
+# --- 2. STREAMLIT UI SETUP ---
+st.title("Brown GP | Timing Worm 🏎️")
 st.write("Select a race to generate the official gap chart.")
 
-# Create two columns for our dropdowns
 col1, col2 = st.columns(2)
 
 with col1:
-    YEAR = st.selectbox("Select Year", [2023, 2022, 2021])
+    # FastF1 has reliable telemetry from 2018 onwards
+    YEAR = st.selectbox("Select Year", [2025, 2024, 2023, 2022, 2021, 2020, 2019, 2018])
 
 with col2:
-    TRACK = st.selectbox("Select Track", [
-        'Bahrain', 'Saudi Arabia', 'Australia', 'Miami', 'Monaco', 
-        'Silverstone', 'Spa', 'Monza', 'Singapore', 'Austin', 'Las Vegas', 'Abu Dhabi'
-    ])
+    # Fetch the official schedule for the selected year
+    schedule = fastf1.get_event_schedule(YEAR)
+    # Filter out pre-season testing so we only get real race weekends
+    race_events = schedule[schedule['EventFormat'] != 'testing']['EventName'].tolist()
+    
+    # The dropdown now automatically populates based on the year!
+    TRACK = st.selectbox("Select Track", race_events)
 
-# Add a button so it only runs when the user is ready
 if st.button("Generate Tower"):
     
-    # --- 2. DATA PULL & LOGIC ---
-    # Put a little loading spinner on the screen while FastF1 downloads the data
+    # --- 3. DATA PULL & LOGIC ---
     with st.spinner(f"Pulling telemetry for {TRACK} {YEAR}..."):
         
-        if not os.path.exists('f1cache'):
-            os.makedirs('f1cache')
-        fastf1.Cache.enable_cache('f1cache')
-
         session = fastf1.get_session(YEAR, TRACK, 'R')
         session.load()
 
@@ -92,8 +95,7 @@ if st.button("Generate Tower"):
             accumulated_colors.append(driver["color"])
             driver_positions.append(driver["position"])
 
-        # --- 3. DRAWING THE GRAPH ---
-        # We assign the plot to 'fig' so Streamlit can render it
+        # --- 4. DRAWING THE GRAPH ---
         fig = plt.figure(figsize=(5, 8)) 
 
         max_y_center = accumulated_gaps[-1] 
@@ -123,9 +125,6 @@ if st.button("Generate Tower"):
         plt.gca().spines['bottom'].set_visible(False)
         plt.grid(False) 
 
-        # --- 4. STREAMLIT RENDER ---
-        # Tell Streamlit to display the figure we just built
+        # --- 5. STREAMLIT RENDER ---
         st.pyplot(fig)
-        
-        # Add a nice little success message at the bottom
         st.success("Tower generated successfully!")
