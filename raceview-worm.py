@@ -30,7 +30,7 @@ animated_view = st.checkbox("Race View (Animated Lap-by-Lap)")
 # Dynamic UI based on the checkbox
 if animated_view:
     # The slider that fixes the lap skipping!
-    frame_delay = st.slider("Animation Speed (seconds per frame)", min_value=0.1, max_value=2.0, value=0.5, step=0.1)
+    frame_delay = st.slider("Animation Speed (seconds per frame)", min_value=0.1, max_value=2.0, value=0.7, step=0.1)
     button_text = "Play Animation ▶️"
 else:
     button_text = "Generate Tower"
