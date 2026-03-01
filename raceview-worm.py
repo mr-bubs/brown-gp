@@ -3,7 +3,7 @@ import fastf1
 import matplotlib.pyplot as plt
 import pandas as pd
 import os
-import time # Needed to control the speed of our animation
+import time
 
 # --- 1. SETUP & CACHE ---
 if not os.path.exists('f1cache'):
@@ -24,16 +24,24 @@ with col2:
     race_events = schedule[schedule['EventFormat'] != 'testing']['EventName'].tolist()
     TRACK = st.selectbox("Select Track", race_events)
 
-# NEW: The Animation Checkbox!
+# NEW: The Animation Checkbox & Slider!
 animated_view = st.checkbox("Race View (Animated Lap-by-Lap)")
 
-if st.button("Generate Tower"):
+# Dynamic UI based on the checkbox
+if animated_view:
+    # The slider that fixes the lap skipping!
+    frame_delay = st.slider("Animation Speed (seconds per frame)", min_value=0.1, max_value=2.0, value=0.5, step=0.1)
+    button_text = "Play Animation ▶️"
+else:
+    button_text = "Generate Tower"
+
+# The button text dynamically changes
+if st.button(button_text):
     
     with st.spinner(f"Pulling telemetry for {TRACK} {YEAR}..."):
         session = fastf1.get_session(YEAR, TRACK, 'R')
         session.load()
         
-        # Grab team colors early so we can use them in both modes
         drivers = session.results['Abbreviation'].tolist()
         colors = {}
         for drv in drivers:
@@ -50,24 +58,20 @@ if st.button("Generate Tower"):
             laps = session.laps
             total_laps = int(laps['LapNumber'].max())
             
-            # This is our magic Streamlit container that we will overwrite every frame
             animation_frame = st.empty()
             
             for current_lap in range(1, total_laps + 1):
-                # Get the data just for this specific lap
                 lap_data = laps[laps['LapNumber'] == current_lap].dropna(subset=['Time'])
                 
                 if lap_data.empty:
                     continue
                     
-                # Sort by who physically crossed the finish line first
                 lap_data = lap_data.sort_values(by='Time')
                 leader_time = lap_data.iloc[0]['Time'].total_seconds()
                 
                 driver_times = []
                 last_time = 0.0
                 
-                # Calculate gaps for this specific lap
                 for index, row in lap_data.iterrows():
                     name = row['Driver']
                     time_behind = row['Time'].total_seconds() - leader_time
@@ -79,7 +83,6 @@ if st.button("Generate Tower"):
                         "position": len(driver_times) + 1
                     })
                 
-                # Flip the data (P-Last becomes 0)
                 if not driver_times: continue
                 p_last_time = driver_times[-1]["time_behind_leader"]
                 
@@ -91,7 +94,6 @@ if st.button("Generate Tower"):
                     accumulated_colors.append(driver["color"])
                     driver_positions.append(driver["position"])
 
-                # Draw the frame
                 fig = plt.figure(figsize=(5, 8)) 
                 max_y_center = accumulated_gaps[-1] if accumulated_gaps else 10
                 plt.bar(x=0, bottom=0, height=max_y_center, width=0.3, color='darkgrey', zorder=1)
@@ -111,20 +113,24 @@ if st.button("Generate Tower"):
                 plt.gca().spines['right'].set_visible(False)
                 plt.gca().spines['bottom'].set_visible(False)
                 
-                # Render the frame into the empty container, overwriting the last lap!
                 animation_frame.pyplot(fig)
-                plt.close(fig) # Close the figure so we don't crash the server's memory
+                plt.close(fig) 
                 
-                # Pause for a fraction of a second before drawing the next lap
-                time.sleep(0.1) 
+                # --- NEW: THE DRAMATIC PAUSE & SPEED CONTROL ---
+                if current_lap == 1:
+                    # Hold the Lap 1 starting grid on screen so the user can get ready!
+                    time.sleep(1.5)
+                else:
+                    # Use the slider value for the rest of the race
+                    time.sleep(frame_delay) 
                 
             st.success("🏁 Checkered Flag!")
 
         # ==========================================
-        # 📊 MODE 2: THE STATIC FINAL CLASSIFICATION (Original Code)
+        # 📊 MODE 2: THE STATIC FINAL CLASSIFICATION
         # ==========================================
         else:
-            import re # Needed for the static code
+            import re 
             results = session.results
             finished_drivers = results[results['Status'].str.contains('Finished|Lap', case=False, na=False)].copy()
             sorted_drivers = finished_drivers.sort_values(by='Position', ascending=True)
