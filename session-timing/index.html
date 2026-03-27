@@ -7,7 +7,7 @@
     <style>
         /* Importing fonts to match the F1 TV style */
         @import url('https://fonts.googleapis.com/css2?family=Titillium+Web:wght@400;600;700&family=Roboto+Mono:wght@500&display=swap');
-        
+
         body {
             background-color: #111111; /* Dark background */
             color: #ffffff;
@@ -178,10 +178,8 @@
             try {
                 // 1. Get the latest session to build the header
                 const sessionResponse = await fetch('https://api.openf1.org/v1/sessions?session_key=latest');
-
-
                 const sessionData = await sessionResponse.json();
-                
+
                 let sessionKey = 'latest';
                 if (sessionData && sessionData.length > 0) {
                     const session = sessionData[0];
@@ -190,17 +188,20 @@
                         `${session.country_name} Grand Prix ${session.year} | ${session.session_name}`;
                 }
 
-                // 2. Fetch Drivers, Positions, Laps, and Tyre Stints in parallel
-                const [driversRes, positionsRes, stintsRes, lapsRes] = await Promise.all([
-                    fetch(`https://api.openf1.org/v1/drivers?session_key=${sessionKey}`),
-                    fetch(`https://api.openf1.org/v1/position?session_key=${sessionKey}`),
-                    fetch(`https://api.openf1.org/v1/stints?session_key=${sessionKey}`),
-                    fetch(`https://api.openf1.org/v1/laps?session_key=${sessionKey}`)
-                ]);
-
+                // 2. Fetch data sequentially to avoid the 3 requests/second rate limit
+                const driversRes = await fetch(`https://api.openf1.org/v1/drivers?session_key=${sessionKey}`);
                 const driversData = await driversRes.json();
+
+                const positionsRes = await fetch(`https://api.openf1.org/v1/position?session_key=${sessionKey}`);
                 const positionsData = await positionsRes.json();
+
+                // Tiny 1-second breather to reset the API speed limit
+                await new Promise(resolve => setTimeout(resolve, 1000));
+
+                const stintsRes = await fetch(`https://api.openf1.org/v1/stints?session_key=${sessionKey}`);
                 const stintsData = await stintsRes.json();
+
+                const lapsRes = await fetch(`https://api.openf1.org/v1/laps?session_key=${sessionKey}`);
                 const lapsData = await lapsRes.json();
 
                 const leaderboard = document.getElementById('leaderboard');
@@ -211,7 +212,7 @@
                     // Find latest position
                     const dPositions = positionsData.filter(p => p.driver_number === driver.driver_number);
                     const latestPos = dPositions.length > 0 ? dPositions[dPositions.length - 1].position : 0;
-                    
+
                     // Find fastest lap time
                     const dLaps = lapsData.filter(l => l.driver_number === driver.driver_number && l.lap_duration);
                     let bestLap = 'NO TIME';
@@ -265,9 +266,9 @@
 
         // Run immediately when page loads
         fetchLiveTiming();
-        
-        // Refresh the live data automatically every 15 seconds
-        setInterval(fetchLiveTiming, 15000);
+
+        // Refresh the live data automatically every 30 seconds to stay safely under the 30 requests/minute limit
+        setInterval(fetchLiveTiming, 30000);
     </script>
 </body>
 </html>
