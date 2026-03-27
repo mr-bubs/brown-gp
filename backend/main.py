@@ -13,12 +13,31 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# A simple check to ensure the server is awake
+# Disguise our server as a regular web browser so F1's bouncers let us in
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+}
+
 @app.get("/")
 def read_root():
     return {"status": "Brown GP Middleman is Live!"}
 
-# The F1 Data Fetcher (We will expand this later to pull the live feed)
-@app.get("/api/f1-data")
-def get_f1_data():
-    return {"message": "Ready to connect to livetiming.formula1.com"}
+# Endpoint 1: Fetch the Live Timing Tower Data
+@app.get("/api/timing")
+def get_timing():
+    try:
+        url = "https://livetiming.formula1.com/static/TimingData.json"
+        response = requests.get(url, headers=HEADERS)
+        return response.json()
+    except Exception as e:
+        return {"error": "Failed to fetch timing data"}
+
+# Endpoint 2: Fetch the Session Info (Track, Name)
+@app.get("/api/session")
+def get_session():
+    try:
+        url = "https://livetiming.formula1.com/static/SessionInfo.json"
+        response = requests.get(url, headers=HEADERS)
+        return response.json()
+    except Exception as e:
+        return {"error": "Failed to fetch session info"}
