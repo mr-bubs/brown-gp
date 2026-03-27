@@ -108,7 +108,7 @@
 <body>
 
     <div class="header" id="session-header">
-        Connecting to Render Backend...
+        Waiting for Live Session...
     </div>
 
     <div class="timing-tower">
@@ -129,7 +129,7 @@
 
         async function fetchLiveTiming() {
             try {
-                // 1. Fetch Session and Timing data from your Render middleman
+                // 1. Fetch Session and Timing data from your middleman
                 const [sessionRes, timingRes] = await Promise.all([
                     fetch(`${BACKEND_URL}/api/session`),
                     fetch(`${BACKEND_URL}/api/timing`)
@@ -206,7 +206,7 @@
             } catch (error) {
                 console.error("Error pulling F1 stream data:", error);
                 document.getElementById('leaderboard').innerHTML = 
-                    `<div class="loading" style="color:#ff2a2a;">Waiting for Render Server to wake up... Retrying...</div>`;
+                    `<div class="loading" style="color:#a0a0b0;">No active session. Waiting for next session to begin...</div>`;
             }
         }
 
