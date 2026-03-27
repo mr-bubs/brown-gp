@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Brown GP - Hub</title>
+    <style>
+        /* Importing a clean font */
+        @import url('https://fonts.googleapis.com/css2?family=Titillium+Web:wght@400;600;700&display=swap');
+        
+        body {
+            background-color: #111111; /* Dark F1 background */
+            color: #ffffff;
+            font-family: 'Titillium Web', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            padding-top: 10vh; /* Pushes content down slightly from the top */
+        }
+
+        /* Main Logo / Title Area */
+        h1 {
+            font-size: 3rem;
+            margin-bottom: 5px;
+            letter-spacing: 2px;
+        }
+
+        .subtitle {
+            color: #a0a0b0;
+            font-size: 1.2rem;
+            margin-top: 0;
+            margin-bottom: 40px;
+            border-bottom: 3px solid #e10600; /* F1 Red accent line */
+            padding-bottom: 15px;
+        }
+
+        /* Menu Container */
+        .menu-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px; /* Space between buttons */
+            width: 100%;
+            max-width: 350px;
+            padding: 0 20px;
+            box-sizing: border-box;
+        }
+
+        /* The Buttons */
+        .nav-button {
+            background-color: #1a1a24;
+            color: #ffffff;
+            text-decoration: none;
+            text-align: center;
+            padding: 18px 20px;
+            font-size: 1.2rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border: 2px solid #2a2a35;
+            border-radius: 8px;
+            transition: all 0.3s ease; /* Smooth animation for hovering */
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+
+        /* What happens when you hover over a button */
+        .nav-button:hover {
+            border-color: #e10600; /* Border turns red */
+            background-color: #242430; /* Background gets slightly lighter */
+            transform: translateY(-2px); /* Button lifts up slightly */
+            box-shadow: 0 6px 12px rgba(225, 6, 0, 0.2); /* Red glow shadow */
+        }
+
+        .live-dot {
+            color: #e10600;
+            margin-right: 8px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>BROWN GP</h1>
+    <p class="subtitle">F1 Data & Analytics Dashboard</p>
+    
+    <div class="menu-container">
+        
+        <!-- BUTTON 1: Live Session Timing -->
+        <a href="/session-timing/" class="nav-button">
+            <span class="live-dot">●</span> Live Session
+        </a>
+
+        <!-- FUTURE BUTTONS CAN GO HERE -->
+        <!-- Just copy the 3 lines of code above and paste them here when you build your next tool -->
+
+    </div>
+
+</body>
+</html>
