@@ -6,7 +6,6 @@
     <style>
         body { background-color: #0e1117; color: white; font-family: sans-serif; display: flex; margin: 0; height: 100vh; overflow: hidden; }
         
-        /* Sidebar (Gap Tower) */
         #sidebar { width: 380px; background-color: #1a1c23; padding: 20px; border-right: 1px solid #333; overflow-y: auto; position: relative; }
         .tower-header { font-size: 20px; font-weight: bold; margin-bottom: 20px; }
         #tower-container { position: relative; min-height: 800px; margin-left: 80px; margin-top: 20px; }
@@ -18,21 +17,18 @@
         .team-box { padding: 4px 6px; border: 1px solid #111; color: white; font-weight: bold; font-size: 13px; width: 60px; text-align: center; text-shadow: 1px 1px 2px rgba(0,0,0,0.8); }
         .timing-info { padding-left: 10px; font-size: 12px; font-weight: bold; white-space: nowrap; }
 
-        /* Main Area (Tracker & Race Control) */
         #main { flex-grow: 1; display: flex; flex-direction: column; padding: 20px; overflow: hidden; }
-        #header-title { font-size: 24px; font-weight: bold; color: #f1f1f1; margin-bottom: 15px; border-bottom: 2px solid #333; padding-bottom: 10px; }
+        #header-title { font-size: 20px; color: #aaa; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 10px; }
         
         .map-section { flex-grow: 1; display: flex; flex-direction: column; min-height: 400px; }
         .slider-container { display: flex; gap: 20px; margin-bottom: 10px; font-size: 14px; }
         canvas { background-color: transparent; border: 1px solid #333; border-radius: 8px; width: 100%; height: 100%; box-sizing: border-box; }
         
-        /* Race Control Board */
         .rcm-section { height: 250px; margin-top: 20px; display: flex; flex-direction: column; }
         .rcm-box { flex-grow: 1; border: 1px solid #333; border-radius: 8px; background: #1a1c23; overflow-y: auto; padding: 10px; font-size: 13px; font-family: monospace; }
         .rcm-msg { margin-bottom: 8px; border-bottom: 1px solid #222; padding-bottom: 4px; }
         .rcm-time { color: #888; margin-right: 10px; }
         
-        /* Custom Pop-up Toast */
         #f1-toast { position: fixed; top: 20px; right: -400px; width: 350px; background-color: #222; color: white; padding: 15px; border-radius: 8px; border-left: 6px solid #FFD700; box-shadow: 0px 4px 15px rgba(0,0,0,0.6); z-index: 9999; display: flex; align-items: center; justify-content: space-between; cursor: pointer; transition: right 0.4s ease; }
         .toast-title { font-weight: bold; font-size: 15px; margin-bottom: 5px; }
         .toast-body { font-size: 13px; }
@@ -46,15 +42,14 @@
         <div class="tower-header" id="lap-header">Live Race Gaps</div>
         <div id="tower-container">
             <div id="spine"></div>
-            </div>
+        </div>
     </div>
 
     <div id="main">
         <h1 style="margin: 0 0 5px 0; font-size: 32px; letter-spacing: -0.5px;">Brown GP | Live Dashboard</h1>
-        <div id="header-title" style="font-size: 20px; color: #aaa; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 10px;">📍 Waiting for Session...</div>
+        <div id="header-title">📍 Waiting for Session...</div>
         
         <div class="map-section">
-       
             <div style="font-size: 18px; font-weight: bold; margin-bottom: 10px;">Driver Tracker</div>
             <div class="slider-container">
                 <label>Rotation: <input type="range" id="rotSlider" min="0" max="360" value="0"></label>
@@ -65,8 +60,7 @@
 
         <div class="rcm-section" id="rcm-anchor">
             <div style="font-size: 18px; font-weight: bold; margin-bottom: 10px;">Race Control</div>
-            <div class="rcm-box" id="rcm-board">
-                </div>
+            <div class="rcm-box" id="rcm-board"></div>
         </div>
     </div>
 
@@ -79,7 +73,6 @@
     </div>
 
     <script>
-        // --- 1. SETUP CANVAS & SLIDERS ---
         const canvas = document.getElementById('trackCanvas');
         const ctx = canvas.getContext('2d');
         const rotSlider = document.getElementById('rotSlider');
@@ -93,54 +86,68 @@
         window.addEventListener('resize', resizeCanvas);
 
         let trackX = [], trackY = [], drivers = [];
+        let pointSectors = []; 
+        let activeYellowSectors = [];
         let cx = 0, cy = 0;
-        let lastToastMsg = "";
-        const toastKeywords = ['YELLOW', 'RED FLAG', 'BLACK AND WHITE', 'PENALTY', 'VIRTUAL SAFETY CAR', 'SAFETY CAR'];
 
-        // --- 2. WEBSOCKET CONNECTION ---
-        const ws = new WebSocket(`ws://${window.location.host}/ws`);
+        // -> THIS IS THE CRITICAL LINE WE CHANGED TO CONNECT TO RENDER <-
+        const ws = new WebSocket("wss://brown-gp.onrender.com/ws");
         
         ws.onmessage = function(event) {
             const data = JSON.parse(event.data);
             
-            // Update Headers
             document.getElementById('header-title').innerText = `📍 ${data.session.title}`;
             document.getElementById('lap-header').innerText = `Live Race Gaps (${data.session.lap})`;
 
-            // Update Track
-            if (data.track.x.length > 0 && trackX.length === 0) {
-                trackX = data.track.x; trackY = data.track.y;
+            // Initialize Heavy Track Data only when changed
+            if (data.track && data.track.x && data.track.x.length > 0) {
+                trackX = data.track.x; 
+                trackY = data.track.y;
+                let trackDist = data.track.dist;
+                let mSectors = data.track.m_sectors;
                 cx = (Math.max(...trackX) + Math.min(...trackX)) / 2;
                 cy = (Math.max(...trackY) + Math.min(...trackY)) / 2;
+                
+                // Digitize the track points so we know what sector every pixel belongs to
+                pointSectors = [];
+                for(let i=0; i<trackX.length; i++) {
+                    let d = trackDist[i];
+                    let sNum = 1;
+                    for(let m of mSectors) {
+                        if (d >= m.Distance) sNum = m.Number;
+                    }
+                    pointSectors.push(sNum);
+                }
                 resizeCanvas();
             }
             
-            // Update Map Drivers
+            activeYellowSectors = data.yellow_sectors || [];
             drivers = data.map_drivers;
             requestAnimationFrame(drawMap);
 
-            // Update DOM Elements
             renderGapTower(data.tower);
             renderRaceControl(data.rcm);
+            
+            if (data.active_toast) {
+                showToast(data.active_toast);
+            }
         };
 
         rotSlider.addEventListener('input', drawMap);
         tiltSlider.addEventListener('input', drawMap);
 
-        // --- 3. DOM RENDERERS ---
         function renderGapTower(towerData) {
             const container = document.getElementById('tower-container');
             container.innerHTML = '<div id="spine"></div>'; 
             
-            const scaleY = 25; // Pixels per second gap
-            const minRowSpacing = 32; // Force 32px minimum between drivers to prevent mushing!
+            const scaleY = 25; 
+            const minRowSpacing = 32; // COLLISION FIX: Prevents text mushing!
             let lastActualY = -999;
 
             towerData.forEach(drv => {
                 let idealY = drv.gap_secs * scaleY;
                 let actualY = idealY;
                 
-                // VERTICAL COLLISION DETECTION
                 if (idealY < lastActualY + minRowSpacing) {
                     actualY = lastActualY + minRowSpacing;
                 }
@@ -185,26 +192,16 @@
                 div.innerHTML = `<span class="rcm-time">[${msg.time}]</span> ⚠️ <strong>FIA:</strong> ${msg.msg}`;
                 board.appendChild(div);
             });
-
-            // Toast Logic
-            const latestMsg = rcmData[0].msg;
-            if (latestMsg !== lastToastMsg) {
-                lastToastMsg = latestMsg;
-                if (toastKeywords.some(kw => latestMsg.toUpperCase().includes(kw))) {
-                    showToast(latestMsg);
-                }
-            }
         }
 
-        // --- 4. TOAST ALERTS ---
         let toastTimeout;
         function showToast(msg) {
             const toast = document.getElementById('f1-toast');
             document.getElementById('toast-text').innerText = msg;
-            toast.style.right = '20px'; // Slide in
+            toast.style.right = '20px'; 
             
             clearTimeout(toastTimeout);
-            toastTimeout = setTimeout(() => { toast.style.right = '-400px'; }, 4000); // Slide out after 4s
+            toastTimeout = setTimeout(() => { toast.style.right = '-400px'; }, 4000); 
         }
 
         function closeToast(e) {
@@ -217,7 +214,6 @@
             document.getElementById('f1-toast').style.right = '-400px';
         }
 
-        // --- 5. CANVAS MATH & DRAWING ---
         function applyMath(x, y) {
             const rotRad = rotSlider.value * (Math.PI / 180);
             const tiltRad = tiltSlider.value * (Math.PI / 180);
@@ -226,29 +222,25 @@
             let xr = xs * Math.cos(rotRad) - ys * Math.sin(rotRad);
             let yr = xs * Math.sin(rotRad) + ys * Math.cos(rotRad);
             
-            // Dynamic scaling based on canvas size
             let scale = Math.min(canvas.width, canvas.height) / 12000; 
             
-            return {
-                x: (canvas.width / 2) + (xr * scale),
-                y: (canvas.height / 2) + (yr * Math.cos(tiltRad) * scale)
-            };
+            return { x: (canvas.width / 2) + (xr * scale), y: (canvas.height / 2) + (yr * Math.cos(tiltRad) * scale) };
         }
 
         function drawMap() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             if (trackX.length === 0) return;
 
-            // Track Shadow (3D effect)
+            // 1. Track Shadow
             ctx.beginPath();
             for (let i = 0; i < trackX.length; i++) {
                 let pt = applyMath(trackX[i], trackY[i]);
-                if (i === 0) ctx.moveTo(pt.x, pt.y + 10); // Offset down
+                if (i === 0) ctx.moveTo(pt.x, pt.y + 10);
                 else ctx.lineTo(pt.x, pt.y + 10);
             }
             ctx.strokeStyle = '#000'; ctx.lineWidth = 14; ctx.lineJoin = 'round'; ctx.stroke();
 
-            // Track Surface
+            // 2. Track Surface
             ctx.beginPath();
             for (let i = 0; i < trackX.length; i++) {
                 let pt = applyMath(trackX[i], trackY[i]);
@@ -256,9 +248,33 @@
                 else ctx.lineTo(pt.x, pt.y);
             }
             ctx.strokeStyle = '#333'; ctx.lineWidth = 12; ctx.stroke();
+
+            // 3. SECTOR HIGHLIGHTING
+            if (activeYellowSectors.length > 0 && pointSectors.length > 0) {
+                ctx.beginPath();
+                let isDrawing = false;
+                for (let i = 0; i < trackX.length; i++) {
+                    if (activeYellowSectors.includes(pointSectors[i])) {
+                        let pt = applyMath(trackX[i], trackY[i]);
+                        if (!isDrawing) { ctx.moveTo(pt.x, pt.y); isDrawing = true; }
+                        else { ctx.lineTo(pt.x, pt.y); }
+                    } else {
+                        isDrawing = false;
+                    }
+                }
+                ctx.strokeStyle = '#FFD700'; ctx.lineWidth = 14; ctx.stroke();
+            }
+
+            // 4. Track White Dotted Line
+            ctx.beginPath();
+            for (let i = 0; i < trackX.length; i++) {
+                let pt = applyMath(trackX[i], trackY[i]);
+                if (i === 0) ctx.moveTo(pt.x, pt.y);
+                else ctx.lineTo(pt.x, pt.y);
+            }
             ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.setLineDash([5, 5]); ctx.stroke(); ctx.setLineDash([]);
 
-            // Drivers
+            // 5. Drivers
             drivers.forEach(drv => {
                 let pt = applyMath(drv.x, drv.y);
                 
@@ -266,7 +282,7 @@
                 ctx.arc(pt.x, pt.y, 10, 0, 2 * Math.PI);
                 ctx.fillStyle = drv.color;
                 ctx.fill();
-                ctx.strokeStyle = drv.t_color; // Tyre Ring!
+                ctx.strokeStyle = drv.t_color;
                 ctx.lineWidth = 2.5;
                 ctx.stroke();
                 
@@ -275,7 +291,9 @@
                 
                 if (drv.name) {
                     ctx.textAlign = 'left'; ctx.font = 'bold 11px Arial';
+                    ctx.shadowColor="black"; ctx.shadowBlur=4; // Adds a shadow so names don't blend into the yellow track
                     ctx.fillText(drv.name, pt.x + 15, pt.y);
+                    ctx.shadowBlur=0;
                 }
             });
         }
