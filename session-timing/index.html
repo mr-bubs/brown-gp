@@ -177,7 +177,8 @@
         async function fetchLiveTiming() {
             try {
                 // 1. Get the latest session to build the header
-                const sessionResponse = await fetch('https://api.openf1.org/v1/sessions?latest=true');
+                const sessionResponse = await fetch('[https://api.openf1.org/v1/sessions?session_key=latest](https://api.openf1.org/v1/sessions?session_key=latest)'); 
+
                 const sessionData = await sessionResponse.json();
                 
                 let sessionKey = 'latest';
