@@ -9,7 +9,7 @@
         @import url('https://fonts.googleapis.com/css2?family=Titillium+Web:wght@400;600;700&family=Roboto+Mono:wght@500&display=swap');
 
         body {
-            background-color: #111111; /* Dark background */
+            background-color: #111111;
             color: #ffffff;
             font-family: 'Titillium Web', sans-serif;
             margin: 0;
@@ -28,7 +28,7 @@
             font-weight: 700;
             text-transform: uppercase;
             border-radius: 8px 8px 0 0;
-            border-top: 4px solid #e10600; /* F1 Red */
+            border-top: 4px solid #e10600;
             margin-bottom: 0;
             text-align: center;
             width: 100%;
@@ -84,72 +84,31 @@
             border-bottom: none;
         }
 
-        /* Position */
-        .pos {
-            text-align: center;
-            justify-content: center;
-            display: flex;
-            color: #ffffff;
-        }
-
-        /* Driver Acronym and Team Color */
-        .driver {
-            display: flex;
-            align-items: center;
-            border-left: 4px solid;
-            padding-left: 10px;
-            height: 100%;
-            letter-spacing: 1px;
-        }
-
-        /* Lap Time */
-        .time {
-            color: #00e640; /* F1 Timing Green */
-            font-family: 'Roboto Mono', monospace;
-            text-align: left;
-            padding-left: 20px;
-            font-size: 1rem;
-        }
-
-        /* Tyre Symbol Container */
-        .tyre-col {
-            display: flex;
-            justify-content: center;
-        }
-
-        /* Tyre Symbol Circle */
+        .pos { text-align: center; justify-content: center; display: flex; color: #ffffff; }
+        .driver { display: flex; align-items: center; border-left: 4px solid; padding-left: 10px; height: 100%; letter-spacing: 1px; }
+        .time { color: #00e640; font-family: 'Roboto Mono', monospace; text-align: left; padding-left: 20px; font-size: 1rem; }
+        .tyre-col { display: flex; justify-content: center; }
+        
         .tyre {
-            width: 22px;
-            height: 22px;
-            border-radius: 50%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 0.8rem;
-            font-weight: bold;
-            border: 2px solid;
-            background: transparent;
+            width: 22px; height: 22px; border-radius: 50%; display: flex;
+            justify-content: center; align-items: center; font-size: 0.8rem;
+            font-weight: bold; border: 2px solid; background: transparent;
         }
 
-        /* Specific Tyre Colors */
-        .tyre.S { border-color: #ff2a2a; color: #ff2a2a; } /* Soft */
-        .tyre.M { border-color: #ffe600; color: #ffe600; } /* Medium */
-        .tyre.H { border-color: #ffffff; color: #ffffff; } /* Hard */
-        .tyre.I { border-color: #00e640; color: #00e640; } /* Intermediate */
-        .tyre.W { border-color: #00aaff; color: #00aaff; } /* Wet */
+        /* Tyre Colors */
+        .tyre.S { border-color: #ff2a2a; color: #ff2a2a; } 
+        .tyre.M { border-color: #ffe600; color: #ffe600; } 
+        .tyre.H { border-color: #ffffff; color: #ffffff; } 
+        .tyre.I { border-color: #00e640; color: #00e640; } 
+        .tyre.W { border-color: #00aaff; color: #00aaff; } 
 
-        .loading {
-            padding: 30px;
-            text-align: center;
-            color: #a0a0b0;
-            font-weight: 600;
-        }
+        .loading { padding: 30px; text-align: center; color: #a0a0b0; font-weight: 600; }
     </style>
 </head>
 <body>
 
     <div class="header" id="session-header">
-        Connecting to F1 Data...
+        Connecting to Render Backend...
     </div>
 
     <div class="timing-tower">
@@ -160,115 +119,102 @@
             <div class="tyre-header">TYRE</div>
         </div>
         <div id="leaderboard">
-            <div class="loading">Fetching live F1 timings...</div>
+            <div class="loading">Fetching Official F1 Data...</div>
         </div>
     </div>
 
     <script>
-        // Formats the raw seconds into M:SS.mmm (e.g., 1:36.051)
-        function formatTime(duration) {
-            if (!duration) return 'NO TIME';
-            const mins = Math.floor(duration / 60);
-            const secs = (duration % 60).toFixed(3).padStart(6, '0');
-            return `${mins}:${secs}`;
-        }
+        // Set this to your exact Render URL
+        const BACKEND_URL = "https://brown-gp.onrender.com";
 
-        // F1 Timing Logic using the public OpenF1 REST API stream
         async function fetchLiveTiming() {
             try {
-                // 1. Get the latest session to build the header
-                const sessionResponse = await fetch('https://api.openf1.org/v1/sessions?session_key=latest');
-                const sessionData = await sessionResponse.json();
+                // 1. Fetch Session and Timing data from your Render middleman
+                const [sessionRes, timingRes] = await Promise.all([
+                    fetch(`${BACKEND_URL}/api/session`),
+                    fetch(`${BACKEND_URL}/api/timing`)
+                ]);
 
-                let sessionKey = 'latest';
-                if (sessionData && sessionData.length > 0) {
-                    const session = sessionData[0];
-                    sessionKey = session.session_key;
-                    document.getElementById('session-header').innerText = 
-                        `${session.country_name} Grand Prix ${session.year} | ${session.session_name}`;
+                const sessionData = await sessionRes.json();
+                const timingData = await timingRes.json();
+
+                // 2. Build the Header using F1's official naming
+                if (sessionData && !sessionData.error) {
+                    const meetingName = sessionData.Meeting?.Name || "Formula 1";
+                    const sessionName = sessionData.Name || "Live Session";
+                    document.getElementById('session-header').innerText = `${meetingName} | ${sessionName}`;
                 }
 
-                // 2. Fetch data sequentially to avoid the 3 requests/second rate limit
-                const driversRes = await fetch(`https://api.openf1.org/v1/drivers?session_key=${sessionKey}`);
-                const driversData = await driversRes.json();
-
-                const positionsRes = await fetch(`https://api.openf1.org/v1/position?session_key=${sessionKey}`);
-                const positionsData = await positionsRes.json();
-
-                // Tiny 1-second breather to reset the API speed limit
-                await new Promise(resolve => setTimeout(resolve, 1000));
-
-                const stintsRes = await fetch(`https://api.openf1.org/v1/stints?session_key=${sessionKey}`);
-                const stintsData = await stintsRes.json();
-
-                const lapsRes = await fetch(`https://api.openf1.org/v1/laps?session_key=${sessionKey}`);
-                const lapsData = await lapsRes.json();
-
+                // 3. Parse F1's Official Timing Structure
                 const leaderboard = document.getElementById('leaderboard');
-                leaderboard.innerHTML = ''; // Clear loading text
+                
+                if (timingData && timingData.Lines) {
+                    leaderboard.innerHTML = ''; 
+                    let activeDrivers = [];
+                    
+                    // F1 stores drivers inside the "Lines" object
+                    for (const [driverNum, driverInfo] of Object.entries(timingData.Lines)) {
+                        
+                        // Ignore drivers who haven't set a position yet
+                        if (!driverInfo.Position || isNaN(driverInfo.Position)) continue;
 
-                // 3. Process the data for each driver
-                let activeDrivers = driversData.map(driver => {
-                    // Find latest position
-                    const dPositions = positionsData.filter(p => p.driver_number === driver.driver_number);
-                    const latestPos = dPositions.length > 0 ? dPositions[dPositions.length - 1].position : 0;
+                        // Grab Best Lap
+                        let bestLap = 'NO TIME';
+                        if (driverInfo.BestLapTime && driverInfo.BestLapTime.Value) {
+                            bestLap = driverInfo.BestLapTime.Value;
+                        }
 
-                    // Find fastest lap time
-                    const dLaps = lapsData.filter(l => l.driver_number === driver.driver_number && l.lap_duration);
-                    let bestLap = 'NO TIME';
-                    if (dLaps.length > 0) {
-                        const minDuration = Math.min(...dLaps.map(l => l.lap_duration));
-                        bestLap = formatTime(minDuration);
+                        // Grab current Tyre from their Stint history
+                        let currentTyre = 'S'; 
+                        if (driverInfo.Stints && driverInfo.Stints.length > 0) {
+                            const lastStint = driverInfo.Stints[driverInfo.Stints.length - 1];
+                            const compound = lastStint.Compound ? lastStint.Compound.toUpperCase() : '';
+                            if(compound === 'SOFT') currentTyre = 'S';
+                            if(compound === 'MEDIUM') currentTyre = 'M';
+                            if(compound === 'HARD') currentTyre = 'H';
+                            if(compound === 'INTERMEDIATE') currentTyre = 'I';
+                            if(compound === 'WET') currentTyre = 'W';
+                        }
+
+                        activeDrivers.push({
+                            pos: parseInt(driverInfo.Position),
+                            name: driverInfo.Tla || "UNK",
+                            color: '#' + (driverInfo.TeamColour || 'ffffff'),
+                            time: bestLap,
+                            tyre: currentTyre
+                        });
                     }
 
-                    // Find current tyre from latest stint
-                    const dStints = stintsData.filter(s => s.driver_number === driver.driver_number);
-                    let currentTyre = 'S'; // Fallback
-                    if (dStints.length > 0) {
-                        const compound = dStints[dStints.length - 1].compound;
-                        if(compound === 'SOFT') currentTyre = 'S';
-                        if(compound === 'MEDIUM') currentTyre = 'M';
-                        if(compound === 'HARD') currentTyre = 'H';
-                        if(compound === 'INTERMEDIATE') currentTyre = 'I';
-                        if(compound === 'WET') currentTyre = 'W';
-                    }
-
-                    return {
-                        pos: latestPos,
-                        name: driver.name_acronym,
-                        color: '#' + (driver.team_colour || 'ffffff'), // Team color border
-                        time: bestLap,
-                        tyre: currentTyre
-                    };
-                });
-
-                // 4. Sort drivers by position and render HTML rows
-                activeDrivers.filter(d => d.pos > 0).sort((a, b) => a.pos - b.pos).forEach(d => {
-                    const row = document.createElement('div');
-                    row.className = 'driver-row';
-                    row.innerHTML = `
-                        <div class="pos">${d.pos}</div>
-                        <div class="driver" style="border-color: ${d.color};">${d.name}</div>
-                        <div class="time">${d.time}</div>
-                        <div class="tyre-col">
-                            <div class="tyre ${d.tyre}">${d.tyre}</div>
-                        </div>
-                    `;
-                    leaderboard.appendChild(row);
-                });
+                    // Sort drivers by position and render them to the screen
+                    activeDrivers.sort((a, b) => a.pos - b.pos).forEach(d => {
+                        const row = document.createElement('div');
+                        row.className = 'driver-row';
+                        row.innerHTML = `
+                            <div class="pos">${d.pos}</div>
+                            <div class="driver" style="border-color: ${d.color};">${d.name}</div>
+                            <div class="time">${d.time}</div>
+                            <div class="tyre-col">
+                                <div class="tyre ${d.tyre}">${d.tyre}</div>
+                            </div>
+                        `;
+                        leaderboard.appendChild(row);
+                    });
+                } else {
+                     throw new Error("Data missing from F1 feed");
+                }
 
             } catch (error) {
                 console.error("Error pulling F1 stream data:", error);
                 document.getElementById('leaderboard').innerHTML = 
-                    `<div class="loading" style="color:#ff2a2a;">Could not connect to live F1 stream. Retrying...</div>`;
+                    `<div class="loading" style="color:#ff2a2a;">Waiting for Render Server to wake up... Retrying...</div>`;
             }
         }
 
         // Run immediately when page loads
         fetchLiveTiming();
 
-        // Refresh the live data automatically every 30 seconds to stay safely under the 30 requests/minute limit
-        setInterval(fetchLiveTiming, 30000);
+        // Refresh every 10 seconds (Because we are using the official feed, we don't have severe speed limits!)
+        setInterval(fetchLiveTiming, 10000);
     </script>
 </body>
 </html>
