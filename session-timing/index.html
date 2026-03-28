@@ -59,9 +59,10 @@
             overflow: hidden;
         }
 
+        /* Updated Grid Layout - Frees up right side */
         .tower-header {
             display: grid;
-            grid-template-columns: 60px 80px 1fr 60px;
+            grid-template-columns: 50px 80px 40px 1fr;
             background-color: #242430;
             padding: 12px 0;
             font-size: 0.85rem;
@@ -73,10 +74,8 @@
         .tower-header > div { display: flex; align-items: center; }
         .pos-header { justify-content: center; }
         .driver-header { padding-left: 10px; }
-        .time-header { padding-left: 20px; }
-        .tyre-header { justify-content: center; }
+        .time-header { padding-left: 10px; } /* Aligned closer to the tyre */
 
-        /* Expandable Container Styles */
         .driver-container {
             border-bottom: 1px solid #2a2a35;
             cursor: pointer;
@@ -91,16 +90,15 @@
 
         .driver-row {
             display: grid;
-            grid-template-columns: 60px 80px 1fr 60px;
+            grid-template-columns: 50px 80px 40px 1fr;
             padding: 8px 0;
             align-items: center;
             font-size: 1.1rem;
             font-weight: 700;
         }
 
-        /* Q1, Q2, Q3 Dropdown Styles */
         .expanded-details {
-            display: none; /* Hidden until clicked */
+            display: none; 
             background-color: #111118;
             padding: 12px 20px;
             font-size: 0.85rem;
@@ -122,19 +120,13 @@
             font-size: 0.95rem;
         }
 
-        /* The class that triggers the expansion */
-        .driver-container.open .expanded-details {
-            display: flex;
-        }
-        .driver-container.open {
-            background-color: #15151e;
-        }
+        .driver-container.open .expanded-details { display: flex; }
+        .driver-container.open { background-color: #15151e; }
 
         .pos { text-align: center; justify-content: center; display: flex; color: #ffffff; }
         .driver { display: flex; align-items: center; border-left: 4px solid; padding-left: 10px; height: 100%; letter-spacing: 1px; }
-        .time { color: #00e640; font-family: 'Roboto Mono', monospace; text-align: left; padding-left: 20px; font-size: 1rem; }
-        .tyre-col { display: flex; justify-content: center; }
-
+        
+        .tyre-col { display: flex; justify-content: center; align-items: center; }
         .tyre {
             width: 22px; height: 22px; border-radius: 50%; display: flex;
             justify-content: center; align-items: center; font-size: 0.8rem;
@@ -146,6 +138,8 @@
         .tyre.H { border-color: #ffffff; color: #ffffff; } 
         .tyre.I { border-color: #00e640; color: #00e640; } 
         .tyre.W { border-color: #00aaff; color: #00aaff; } 
+
+        .time { color: #00e640; font-family: 'Roboto Mono', monospace; text-align: left; padding-left: 10px; font-size: 1rem; }
 
         .loading { padding: 30px; text-align: center; color: #a0a0b0; font-weight: 600; }
     </style>
@@ -163,8 +157,8 @@
         <div class="tower-header">
             <div class="pos-header">POS</div>
             <div class="driver-header">DRIVER</div>
+            <div></div> <!-- Spacer for tyre column -->
             <div class="time-header">LAP TIME</div>
-            <div class="tyre-header">TYRE</div>
         </div>
         <div id="leaderboard">
             <div class="loading">Bootstrapping Telemetry...</div>
@@ -186,14 +180,16 @@
                 const timingData = await timingRes.json();
                 const driverData = await driverRes.json();
 
-                // Build the Header and Show/Hide End Banner
                 if (sessionData && !sessionData.error) {
                     const meetingName = sessionData.Meeting?.Name || "Formula 1";
                     const sessionName = sessionData.Name || "Live Session";
                     const headerEl = document.getElementById('session-header');
                     const bannerEl = document.getElementById('session-ended-banner');
                     
-                    if (sessionData.SessionStatus === "Inactive") {
+                    // F1 uses several status codes for concluded sessions
+                    const isSessionEnded = ["Inactive", "Finished", "Aborted"].includes(sessionData.SessionStatus);
+                    
+                    if (isSessionEnded) {
                         bannerEl.style.display = "block";
                         headerEl.style.borderTopColor = "#a0a0b0"; 
                         headerEl.innerText = `${meetingName} | ${sessionName}`;
@@ -205,8 +201,6 @@
                 }
 
                 const leaderboard = document.getElementById('leaderboard');
-
-                // Memory Function: Remember which drivers are currently clicked open
                 const openContainers = document.querySelectorAll('.driver-container.open');
                 const openNames = Array.from(openContainers).map(c => c.dataset.driver);
 
@@ -222,7 +216,6 @@
                             bestLap = driverInfo.BestLapTime.Value;
                         }
 
-                        // Parse Q1, Q2, and Q3 Lap Times safely
                         let q1 = '--', q2 = '--', q3 = '--';
                         if (driverInfo.BestLapTimes && Array.isArray(driverInfo.BestLapTimes)) {
                             if (driverInfo.BestLapTimes.length > 0) q1 = driverInfo.BestLapTimes[0].Value || '--';
@@ -258,30 +251,27 @@
                     if (activeDrivers.length > 0) {
                         leaderboard.innerHTML = ''; 
                         activeDrivers.sort((a, b) => a.pos - b.pos).forEach(d => {
-                            
-                            // Build the expandable container
                             const container = document.createElement('div');
                             container.className = 'driver-container';
-                            container.dataset.driver = d.name; // Tag it so we can remember if it's open
+                            container.dataset.driver = d.name; 
                             
-                            // Re-open if it was open before the refresh
                             if (openNames.includes(d.name)) {
                                 container.classList.add('open');
                             }
 
-                            // Toggle function on click
                             container.onclick = function() {
                                 this.classList.toggle('open');
                             };
 
+                            // Reordered UI layout here
                             container.innerHTML = `
                                 <div class="driver-row">
                                     <div class="pos">${d.pos}</div>
                                     <div class="driver" style="border-color: ${d.color};">${d.name}</div>
-                                    <div class="time">${d.time}</div>
                                     <div class="tyre-col">
                                         <div class="tyre ${d.tyre}">${d.tyre}</div>
                                     </div>
+                                    <div class="time">${d.time}</div>
                                 </div>
                                 <div class="expanded-details">
                                     <div>Q1 <span>${d.q1}</span></div>
