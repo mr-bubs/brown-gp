@@ -38,19 +38,22 @@ def read_root():
 def get_timing():
     try:
         url = "https://livetiming.formula1.com/static/TimingData.json"
-        response = requests.get(url, headers=HEADERS, timeout=2.0)
+        response = requests.get(url, headers=HEADERS, timeout=10.0)
+        response.raise_for_status() # This forces an error if F1 returns a 403 Forbidden
         return response.json()
-    except Exception:
-        return {"error": "Failed to fetch timing data"}
+    except Exception as e:
+        return {"error": "Failed to fetch timing data", "details": str(e)}
 
 @app.get("/api/session")
 def get_session():
     try:
         url = "https://livetiming.formula1.com/static/SessionInfo.json"
-        response = requests.get(url, headers=HEADERS, timeout=2.0)
+        response = requests.get(url, headers=HEADERS, timeout=10.0)
+        response.raise_for_status()
         return response.json()
-    except Exception:
-        return {"error": "Failed to fetch session info"}
+    except Exception as e:
+        return {"error": "Failed to fetch session info", "details": str(e)}
+
 
 # --- FIX #2: ISOLATING THE HEAVY FASTF1 MATH ---
 def get_track_background_sync(year, circuit, session_name):
