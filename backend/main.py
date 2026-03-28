@@ -34,17 +34,6 @@ def read_root():
     return {"status": "Brown GP Middleman is Live!"}
 
 # --- FIX #1: RESTORED THE MISSING API ROUTES ---
-@app.get("/api/timing")
-def get_timing():
-    try:
-        url = "https://livetiming.formula1.com/static/TimingData.json"
-        response = requests.get(url, headers=HEADERS, timeout=10.0)
-        response.raise_for_status()
-        # The magic fix: decode with utf-8-sig to strip the invisible F1 characters
-        return json.loads(response.content.decode('utf-8-sig'))
-    except Exception as e:
-        return {"error": "Failed to fetch timing data", "details": str(e)}
-
 @app.get("/api/session")
 def get_session():
     try:
@@ -55,6 +44,22 @@ def get_session():
     except Exception as e:
         return {"error": "Failed to fetch session info", "details": str(e)}
 
+@app.get("/api/timing")
+def get_timing():
+    try:
+        # Step 1: Find out which folder F1 is using right now
+        session_url = "https://livetiming.formula1.com/static/SessionInfo.json"
+        session_resp = requests.get(session_url, headers=HEADERS, timeout=10.0)
+        session_data = json.loads(session_resp.content.decode('utf-8-sig'))
+        current_path = session_data.get("Path", "")
+        
+        # Step 2: Grab the timing data from that specific folder
+        url = f"https://livetiming.formula1.com/static/{current_path}TimingData.json"
+        response = requests.get(url, headers=HEADERS, timeout=10.0)
+        response.raise_for_status()
+        return json.loads(response.content.decode('utf-8-sig'))
+    except Exception as e:
+        return {"error": "Failed to fetch timing data", "details": str(e)}
 
 
 # --- FIX #2: ISOLATING THE HEAVY FASTF1 MATH ---
@@ -103,14 +108,26 @@ async def websocket_endpoint(websocket: WebSocket):
 
 async def fetch_api(endpoint):
     try:
-        url = f"https://livetiming.formula1.com/static/{endpoint}.json"
+        # Step 1: Always check the main desk for the current session folder
+        session_url = "https://livetiming.formula1.com/static/SessionInfo.json"
+        session_resp = await asyncio.to_thread(requests.get, session_url, headers=HEADERS, timeout=5.0)
+        session_data = json.loads(session_resp.content.decode('utf-8-sig'))
+        
+        # If the app just wanted the Session Info, hand it back immediately
+        if endpoint == "SessionInfo":
+            return session_data
+            
+        # Step 2: For everything else (Positions, Timing, etc.), go to the specific folder
+        current_path = session_data.get("Path", "")
+        url = f"https://livetiming.formula1.com/static/{current_path}{endpoint}.json"
+        
         resp = await asyncio.to_thread(requests.get, url, headers=HEADERS, timeout=5.0)
         resp.raise_for_status()
-        # Apply the exact same BOM fix here for the live tracker
         return json.loads(resp.content.decode('utf-8-sig'))
     except Exception as e: 
         print(f"API Fetch Error: {e}")
         return {}
+
 
 
 async def data_engine():
