@@ -118,7 +118,7 @@ async def f1_signalr_client():
 
     # 🚨 THE FIX: Bootstrap the baseline data before connecting! 🚨
     try:
-        print("Bootstrapping baseline data (Names, Colors, Session)...")
+        print("Bootstrapping baseline data (Names, Colors, Session, Final Standings)...")
         session_url = "https://livetiming.formula1.com/static/SessionInfo.json"
         session_resp = await asyncio.to_thread(requests.get, session_url, headers=HEADERS, timeout=10)
         session_data = json.loads(session_resp.content.decode('utf-8-sig'))
@@ -126,11 +126,13 @@ async def f1_signalr_client():
         
         path = session_data.get("Path", "")
         if path:
-            driver_url = f"https://livetiming.formula1.com/static/{path}DriverList.json"
-            driver_resp = await asyncio.to_thread(requests.get, driver_url, headers=HEADERS, timeout=10)
-            if driver_resp.status_code == 200:
-                LIVE_DATA["DriverList"] = json.loads(driver_resp.content.decode('utf-8-sig'))
-        print("Bootstrap complete!")
+            # We now fetch DriverList AND the Final Timing Data!
+            for endpoint in ["DriverList", "TimingData", "TimingAppData"]:
+                ep_url = f"https://livetiming.formula1.com/static/{path}{endpoint}.json"
+                ep_resp = await asyncio.to_thread(requests.get, ep_url, headers=HEADERS, timeout=10)
+                if ep_resp.status_code == 200:
+                    LIVE_DATA[endpoint] = json.loads(ep_resp.content.decode('utf-8-sig'))
+        print("Bootstrap complete! Final standings loaded.")
     except Exception as e:
         print(f"Bootstrap skipped: {e}")
 
@@ -207,6 +209,7 @@ async def data_engine():
             cars_pos = latest_update.get('Entries', {}) if isinstance(latest_update, dict) else {}
 
             session_title, lap_display_str = "📍 Waiting...", "Lap ?"
+            session_status = "Waiting"
 
             if info and isinstance(info, dict):
                 new_circuit = info.get('Meeting', {}).get('Name', 'Bahrain')
@@ -220,6 +223,11 @@ async def data_engine():
                     send_track = True
 
                 session_title = f"{live_circuit} | {live_session}" if live_year == 2026 else f"{live_circuit}, {live_year} | {live_session}"
+                
+                # Check the official session status!
+                session_status = info.get('SessionStatus', 'Waiting')
+                if session_status == 'Inactive':
+                    lap_display_str = "Session Ended"
 
             if isinstance(messages, list) and len(messages) > last_rcm_count:
                 new_msgs = messages[last_rcm_count:]
@@ -308,7 +316,8 @@ async def data_engine():
                     if d['gap_secs'] <= running_max: d['gap_secs'] = running_max + 1.0
                 running_max = d['gap_secs']
 
-            lap_display_str = f"Lap {current_lap}/{total_laps}" if total_laps else f"Lap {current_lap}"
+            if session_status != 'Inactive':
+                lap_display_str = f"Lap {current_lap}/{total_laps}" if total_laps else f"Lap {current_lap}"
 
             rcm_payload = []
             if isinstance(messages, list):
@@ -319,7 +328,7 @@ async def data_engine():
                     rcm_payload.append({"time": time_str, "msg": rcm_text})
 
             state = {
-                "session": {"title": session_title, "lap": lap_display_str},
+                "session": {"title": session_title, "lap": lap_display_str, "status": session_status},
                 "map_drivers": map_drivers_payload,
                 "tower": tower_payload,
                 "rcm": rcm_payload,
