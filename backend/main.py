@@ -67,6 +67,12 @@ def get_session():
 def get_timing():
     return LIVE_DATA.get("TimingData", {})
 
+# ADD THIS NEW ROUTE:
+@app.get("/api/drivers")
+def get_drivers():
+    return LIVE_DATA.get("DriverList", {})
+
+
 def get_track_background_sync(year, circuit, session_name):
     try:
         session = fastf1.get_session(year, circuit, session_name)
