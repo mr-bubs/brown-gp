@@ -8,7 +8,6 @@ import base64
 import zlib
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
 import uvicorn
 import os
 import time
@@ -43,14 +42,12 @@ LIVE_DATA = {
     "DriverList": {}
 }
 
-# Decrypts F1's Base64 + GZIP telemetry stream
 def decode_f1_z(encoded_str):
     try:
         return json.loads(zlib.decompress(base64.b64decode(encoded_str), -zlib.MAX_WBITS))
     except:
         return {}
 
-# Recursively merges F1's delta updates into our Global Memory
 def update_dict(base, delta):
     for k, v in delta.items():
         if isinstance(v, dict) and k in base and isinstance(base[k], dict):
@@ -119,6 +116,24 @@ async def f1_signalr_client():
     connection_data = '[{"name":"Streaming"}]'
     enc_conn = urllib.parse.quote(connection_data)
 
+    # 🚨 THE FIX: Bootstrap the baseline data before connecting! 🚨
+    try:
+        print("Bootstrapping baseline data (Names, Colors, Session)...")
+        session_url = "https://livetiming.formula1.com/static/SessionInfo.json"
+        session_resp = await asyncio.to_thread(requests.get, session_url, headers=HEADERS, timeout=10)
+        session_data = json.loads(session_resp.content.decode('utf-8-sig'))
+        LIVE_DATA["SessionInfo"] = session_data
+        
+        path = session_data.get("Path", "")
+        if path:
+            driver_url = f"https://livetiming.formula1.com/static/{path}DriverList.json"
+            driver_resp = await asyncio.to_thread(requests.get, driver_url, headers=HEADERS, timeout=10)
+            if driver_resp.status_code == 200:
+                LIVE_DATA["DriverList"] = json.loads(driver_resp.content.decode('utf-8-sig'))
+        print("Bootstrap complete!")
+    except Exception as e:
+        print(f"Bootstrap skipped: {e}")
+
     while True:
         try:
             print("Negotiating with F1 SignalR Hub...")
@@ -164,13 +179,11 @@ async def f1_signalr_client():
                                 else:
                                     update_dict(LIVE_DATA.setdefault(category, {}), payload)
                     
-                    # 🚨 THE FIX: Let Render breathe for 10 milliseconds so it doesn't kill the server! 🚨
                     await asyncio.sleep(0.01)
 
         except Exception as e:
             print(f"SignalR Disconnected: {e}. Reconnecting in 5s...")
             await asyncio.sleep(5)
-
 
 # --- TASK 2: DASHBOARD BROADCASTER ---
 async def data_engine():
