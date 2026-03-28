@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Brown GP - Live Timing</title>
     <style>
-        /* Importing fonts to match the F1 TV style */
         @import url('https://fonts.googleapis.com/css2?family=Titillium+Web:wght@400;600;700&family=Roboto+Mono:wght@500&display=swap');
 
         body {
@@ -19,7 +18,6 @@
             align-items: center;
         }
 
-        /* Session Header */
         .header {
             background-color: #15151e;
             color: white;
@@ -37,7 +35,6 @@
             letter-spacing: 0.5px;
         }
 
-        /* Timing Tower Container */
         .timing-tower {
             background-color: #1a1a24;
             width: 100%;
@@ -47,7 +44,6 @@
             overflow: hidden;
         }
 
-        /* Column Headers */
         .tower-header {
             display: grid;
             grid-template-columns: 60px 80px 1fr 60px;
@@ -59,17 +55,12 @@
             border-bottom: 2px solid #e10600;
         }
 
-        .tower-header > div {
-            display: flex;
-            align-items: center;
-        }
-
+        .tower-header > div { display: flex; align-items: center; }
         .pos-header { justify-content: center; }
         .driver-header { padding-left: 10px; }
         .time-header { padding-left: 20px; }
         .tyre-header { justify-content: center; }
 
-        /* Driver Row */
         .driver-row {
             display: grid;
             grid-template-columns: 60px 80px 1fr 60px;
@@ -80,22 +71,18 @@
             font-weight: 700;
         }
 
-        .driver-row:last-child {
-            border-bottom: none;
-        }
-
+        .driver-row:last-child { border-bottom: none; }
         .pos { text-align: center; justify-content: center; display: flex; color: #ffffff; }
         .driver { display: flex; align-items: center; border-left: 4px solid; padding-left: 10px; height: 100%; letter-spacing: 1px; }
         .time { color: #00e640; font-family: 'Roboto Mono', monospace; text-align: left; padding-left: 20px; font-size: 1rem; }
         .tyre-col { display: flex; justify-content: center; }
-        
+
         .tyre {
             width: 22px; height: 22px; border-radius: 50%; display: flex;
             justify-content: center; align-items: center; font-size: 0.8rem;
             font-weight: bold; border: 2px solid; background: transparent;
         }
 
-        /* Tyre Colors */
         .tyre.S { border-color: #ff2a2a; color: #ff2a2a; } 
         .tyre.M { border-color: #ffe600; color: #ffe600; } 
         .tyre.H { border-color: #ffffff; color: #ffffff; } 
@@ -108,63 +95,68 @@
 <body>
 
     <div class="header" id="session-header">
-        Waiting for Live Session...
+        Connecting to F1 Data...
     </div>
 
     <div class="timing-tower">
         <div class="tower-header">
-            <div class="pos-header">POSITION</div>
+            <div class="pos-header">POS</div>
             <div class="driver-header">DRIVER</div>
             <div class="time-header">LAP TIME</div>
             <div class="tyre-header">TYRE</div>
         </div>
         <div id="leaderboard">
-            <div class="loading">Fetching Official F1 Data...</div>
+            <div class="loading">Bootstrapping Telemetry...</div>
         </div>
     </div>
 
     <script>
-        // Set this to your exact Render URL
         const BACKEND_URL = "https://brown-gp.onrender.com";
 
         async function fetchLiveTiming() {
             try {
-                // 1. Fetch Session and Timing data from your middleman
-                const [sessionRes, timingRes] = await Promise.all([
+                // 1. Fetch Session, Timing, AND Drivers!
+                const [sessionRes, timingRes, driverRes] = await Promise.all([
                     fetch(`${BACKEND_URL}/api/session`),
-                    fetch(`${BACKEND_URL}/api/timing`)
+                    fetch(`${BACKEND_URL}/api/timing`),
+                    fetch(`${BACKEND_URL}/api/drivers`)
                 ]);
 
                 const sessionData = await sessionRes.json();
                 const timingData = await timingRes.json();
+                const driverData = await driverRes.json();
 
-                // 2. Build the Header using F1's official naming
+                // 2. Build the Header - Check if session is Inactive!
                 if (sessionData && !sessionData.error) {
                     const meetingName = sessionData.Meeting?.Name || "Formula 1";
                     const sessionName = sessionData.Name || "Live Session";
-                    document.getElementById('session-header').innerText = `${meetingName} | ${sessionName}`;
+                    
+                    let statusText = "";
+                    if (sessionData.SessionStatus === "Inactive") {
+                        statusText = " | FINAL STANDINGS";
+                        document.getElementById('session-header').style.borderTopColor = "#a0a0b0"; // Make it grey to show it's over
+                    }
+
+                    document.getElementById('session-header').innerText = `${meetingName} | ${sessionName}${statusText}`;
                 }
 
-                // 3. Parse F1's Official Timing Structure
+                // 3. Parse Data and Merge Drivers
                 const leaderboard = document.getElementById('leaderboard');
-                
+
                 if (timingData && timingData.Lines) {
-                    leaderboard.innerHTML = ''; 
                     let activeDrivers = [];
                     
-                    // F1 stores drivers inside the "Lines" object
+                    // Handle F1's weird DriverList structure
+                    const driverProfiles = driverData.Lines || driverData || {};
+
                     for (const [driverNum, driverInfo] of Object.entries(timingData.Lines)) {
-                        
-                        // Ignore drivers who haven't set a position yet
                         if (!driverInfo.Position || isNaN(driverInfo.Position)) continue;
 
-                        // Grab Best Lap
                         let bestLap = 'NO TIME';
                         if (driverInfo.BestLapTime && driverInfo.BestLapTime.Value) {
                             bestLap = driverInfo.BestLapTime.Value;
                         }
 
-                        // Grab current Tyre from their Stint history
                         let currentTyre = 'S'; 
                         if (driverInfo.Stints && driverInfo.Stints.length > 0) {
                             const lastStint = driverInfo.Stints[driverInfo.Stints.length - 1];
@@ -176,44 +168,46 @@
                             if(compound === 'WET') currentTyre = 'W';
                         }
 
+                        // Grab the real name and color from the DriverList!
+                        const profile = driverProfiles[driverNum] || {};
+
                         activeDrivers.push({
                             pos: parseInt(driverInfo.Position),
-                            name: driverInfo.Tla || "UNK",
-                            color: '#' + (driverInfo.TeamColour || 'ffffff'),
+                            name: profile.Tla || "UNK",
+                            color: '#' + (profile.TeamColour || 'a0a0b0').replace('##', '#'),
                             time: bestLap,
                             tyre: currentTyre
                         });
                     }
 
-                    // Sort drivers by position and render them to the screen
-                    activeDrivers.sort((a, b) => a.pos - b.pos).forEach(d => {
-                        const row = document.createElement('div');
-                        row.className = 'driver-row';
-                        row.innerHTML = `
-                            <div class="pos">${d.pos}</div>
-                            <div class="driver" style="border-color: ${d.color};">${d.name}</div>
-                            <div class="time">${d.time}</div>
-                            <div class="tyre-col">
-                                <div class="tyre ${d.tyre}">${d.tyre}</div>
-                            </div>
-                        `;
-                        leaderboard.appendChild(row);
-                    });
-                } else {
-                     throw new Error("Data missing from F1 feed");
+                    if (activeDrivers.length > 0) {
+                        leaderboard.innerHTML = ''; 
+                        activeDrivers.sort((a, b) => a.pos - b.pos).forEach(d => {
+                            const row = document.createElement('div');
+                            row.className = 'driver-row';
+                            row.innerHTML = `
+                                <div class="pos">${d.pos}</div>
+                                <div class="driver" style="border-color: ${d.color};">${d.name}</div>
+                                <div class="time">${d.time}</div>
+                                <div class="tyre-col">
+                                    <div class="tyre ${d.tyre}">${d.tyre}</div>
+                                </div>
+                            `;
+                            leaderboard.appendChild(row);
+                        });
+                    }
                 }
-
             } catch (error) {
                 console.error("Error pulling F1 stream data:", error);
-                document.getElementById('leaderboard').innerHTML = 
-                    `<div class="loading" style="color:#a0a0b0;">No active session. Waiting for next session to begin...</div>`;
+                // Don't nuke the board if the session just ended, only if we have NO data.
+                if (document.getElementById('leaderboard').innerHTML.includes("Bootstrapping")) {
+                    document.getElementById('leaderboard').innerHTML = 
+                        `<div class="loading" style="color:#a0a0b0;">Waiting for next session data...</div>`;
+                }
             }
         }
 
-        // Run immediately when page loads
         fetchLiveTiming();
-
-        // Refresh every 10 seconds (Because we are using the official feed, we don't have severe speed limits!)
         setInterval(fetchLiveTiming, 10000);
     </script>
 </body>
