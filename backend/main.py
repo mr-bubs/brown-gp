@@ -39,8 +39,9 @@ def get_timing():
     try:
         url = "https://livetiming.formula1.com/static/TimingData.json"
         response = requests.get(url, headers=HEADERS, timeout=10.0)
-        response.raise_for_status() # This forces an error if F1 returns a 403 Forbidden
-        return response.json()
+        response.raise_for_status()
+        # The magic fix: decode with utf-8-sig to strip the invisible F1 characters
+        return json.loads(response.content.decode('utf-8-sig'))
     except Exception as e:
         return {"error": "Failed to fetch timing data", "details": str(e)}
 
@@ -50,9 +51,10 @@ def get_session():
         url = "https://livetiming.formula1.com/static/SessionInfo.json"
         response = requests.get(url, headers=HEADERS, timeout=10.0)
         response.raise_for_status()
-        return response.json()
+        return json.loads(response.content.decode('utf-8-sig'))
     except Exception as e:
         return {"error": "Failed to fetch session info", "details": str(e)}
+
 
 
 # --- FIX #2: ISOLATING THE HEAVY FASTF1 MATH ---
@@ -102,9 +104,14 @@ async def websocket_endpoint(websocket: WebSocket):
 async def fetch_api(endpoint):
     try:
         url = f"https://livetiming.formula1.com/static/{endpoint}.json"
-        resp = await asyncio.to_thread(requests.get, url, headers=HEADERS, timeout=2.0)
-        return resp.json()
-    except: return {}
+        resp = await asyncio.to_thread(requests.get, url, headers=HEADERS, timeout=5.0)
+        resp.raise_for_status()
+        # Apply the exact same BOM fix here for the live tracker
+        return json.loads(resp.content.decode('utf-8-sig'))
+    except Exception as e: 
+        print(f"API Fetch Error: {e}")
+        return {}
+
 
 async def data_engine():
     track_x, track_y, track_dist, m_sectors, total_laps = [], [], [], [], None
