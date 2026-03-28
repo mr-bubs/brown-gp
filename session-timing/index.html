@@ -18,6 +18,7 @@
             align-items: center;
         }
 
+        /* Header Styles */
         .header {
             background-color: #15151e;
             color: white;
@@ -33,6 +34,20 @@
             max-width: 450px;
             box-sizing: border-box;
             letter-spacing: 0.5px;
+            transition: border-color 0.3s ease;
+        }
+
+        .session-ended-banner {
+            background-color: #e10600;
+            color: white;
+            font-size: 0.85rem;
+            font-weight: 700;
+            text-align: center;
+            padding: 6px 0;
+            width: 100%;
+            max-width: 450px;
+            letter-spacing: 1px;
+            display: none; /* Hidden by default */
         }
 
         .timing-tower {
@@ -61,17 +76,60 @@
         .time-header { padding-left: 20px; }
         .tyre-header { justify-content: center; }
 
+        /* Expandable Container Styles */
+        .driver-container {
+            border-bottom: 1px solid #2a2a35;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .driver-container:hover {
+            background-color: #20202c;
+        }
+
+        .driver-container:last-child { border-bottom: none; }
+
         .driver-row {
             display: grid;
             grid-template-columns: 60px 80px 1fr 60px;
             padding: 8px 0;
-            border-bottom: 1px solid #2a2a35;
             align-items: center;
             font-size: 1.1rem;
             font-weight: 700;
         }
 
-        .driver-row:last-child { border-bottom: none; }
+        /* Q1, Q2, Q3 Dropdown Styles */
+        .expanded-details {
+            display: none; /* Hidden until clicked */
+            background-color: #111118;
+            padding: 12px 20px;
+            font-size: 0.85rem;
+            color: #a0a0b0;
+            justify-content: space-between;
+            border-top: 1px dashed #2a2a35;
+        }
+
+        .expanded-details div {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .expanded-details span {
+            color: #ffffff;
+            font-family: 'Roboto Mono', monospace;
+            font-size: 0.95rem;
+        }
+
+        /* The class that triggers the expansion */
+        .driver-container.open .expanded-details {
+            display: flex;
+        }
+        .driver-container.open {
+            background-color: #15151e;
+        }
+
         .pos { text-align: center; justify-content: center; display: flex; color: #ffffff; }
         .driver { display: flex; align-items: center; border-left: 4px solid; padding-left: 10px; height: 100%; letter-spacing: 1px; }
         .time { color: #00e640; font-family: 'Roboto Mono', monospace; text-align: left; padding-left: 20px; font-size: 1rem; }
@@ -97,6 +155,9 @@
     <div class="header" id="session-header">
         Connecting to F1 Data...
     </div>
+    <div class="session-ended-banner" id="session-ended-banner">
+        LIVE SESSION HAS ENDED
+    </div>
 
     <div class="timing-tower">
         <div class="tower-header">
@@ -115,7 +176,6 @@
 
         async function fetchLiveTiming() {
             try {
-                // 1. Fetch Session, Timing, AND Drivers!
                 const [sessionRes, timingRes, driverRes] = await Promise.all([
                     fetch(`${BACKEND_URL}/api/session`),
                     fetch(`${BACKEND_URL}/api/timing`),
@@ -126,27 +186,32 @@
                 const timingData = await timingRes.json();
                 const driverData = await driverRes.json();
 
-                // 2. Build the Header - Check if session is Inactive!
+                // Build the Header and Show/Hide End Banner
                 if (sessionData && !sessionData.error) {
                     const meetingName = sessionData.Meeting?.Name || "Formula 1";
                     const sessionName = sessionData.Name || "Live Session";
+                    const headerEl = document.getElementById('session-header');
+                    const bannerEl = document.getElementById('session-ended-banner');
                     
-                    let statusText = "";
                     if (sessionData.SessionStatus === "Inactive") {
-                        statusText = " | FINAL STANDINGS";
-                        document.getElementById('session-header').style.borderTopColor = "#a0a0b0"; // Make it grey to show it's over
+                        bannerEl.style.display = "block";
+                        headerEl.style.borderTopColor = "#a0a0b0"; 
+                        headerEl.innerText = `${meetingName} | ${sessionName}`;
+                    } else {
+                        bannerEl.style.display = "none";
+                        headerEl.style.borderTopColor = "#e10600";
+                        headerEl.innerText = `${meetingName} | ${sessionName}`;
                     }
-
-                    document.getElementById('session-header').innerText = `${meetingName} | ${sessionName}${statusText}`;
                 }
 
-                // 3. Parse Data and Merge Drivers
                 const leaderboard = document.getElementById('leaderboard');
+
+                // Memory Function: Remember which drivers are currently clicked open
+                const openContainers = document.querySelectorAll('.driver-container.open');
+                const openNames = Array.from(openContainers).map(c => c.dataset.driver);
 
                 if (timingData && timingData.Lines) {
                     let activeDrivers = [];
-                    
-                    // Handle F1's weird DriverList structure
                     const driverProfiles = driverData.Lines || driverData || {};
 
                     for (const [driverNum, driverInfo] of Object.entries(timingData.Lines)) {
@@ -155,6 +220,14 @@
                         let bestLap = 'NO TIME';
                         if (driverInfo.BestLapTime && driverInfo.BestLapTime.Value) {
                             bestLap = driverInfo.BestLapTime.Value;
+                        }
+
+                        // Parse Q1, Q2, and Q3 Lap Times safely
+                        let q1 = '--', q2 = '--', q3 = '--';
+                        if (driverInfo.BestLapTimes && Array.isArray(driverInfo.BestLapTimes)) {
+                            if (driverInfo.BestLapTimes.length > 0) q1 = driverInfo.BestLapTimes[0].Value || '--';
+                            if (driverInfo.BestLapTimes.length > 1) q2 = driverInfo.BestLapTimes[1].Value || '--';
+                            if (driverInfo.BestLapTimes.length > 2) q3 = driverInfo.BestLapTimes[2].Value || '--';
                         }
 
                         let currentTyre = 'S'; 
@@ -168,7 +241,6 @@
                             if(compound === 'WET') currentTyre = 'W';
                         }
 
-                        // Grab the real name and color from the DriverList!
                         const profile = driverProfiles[driverNum] || {};
 
                         activeDrivers.push({
@@ -176,30 +248,53 @@
                             name: profile.Tla || "UNK",
                             color: '#' + (profile.TeamColour || 'a0a0b0').replace('##', '#'),
                             time: bestLap,
-                            tyre: currentTyre
+                            tyre: currentTyre,
+                            q1: q1,
+                            q2: q2,
+                            q3: q3
                         });
                     }
 
                     if (activeDrivers.length > 0) {
                         leaderboard.innerHTML = ''; 
                         activeDrivers.sort((a, b) => a.pos - b.pos).forEach(d => {
-                            const row = document.createElement('div');
-                            row.className = 'driver-row';
-                            row.innerHTML = `
-                                <div class="pos">${d.pos}</div>
-                                <div class="driver" style="border-color: ${d.color};">${d.name}</div>
-                                <div class="time">${d.time}</div>
-                                <div class="tyre-col">
-                                    <div class="tyre ${d.tyre}">${d.tyre}</div>
+                            
+                            // Build the expandable container
+                            const container = document.createElement('div');
+                            container.className = 'driver-container';
+                            container.dataset.driver = d.name; // Tag it so we can remember if it's open
+                            
+                            // Re-open if it was open before the refresh
+                            if (openNames.includes(d.name)) {
+                                container.classList.add('open');
+                            }
+
+                            // Toggle function on click
+                            container.onclick = function() {
+                                this.classList.toggle('open');
+                            };
+
+                            container.innerHTML = `
+                                <div class="driver-row">
+                                    <div class="pos">${d.pos}</div>
+                                    <div class="driver" style="border-color: ${d.color};">${d.name}</div>
+                                    <div class="time">${d.time}</div>
+                                    <div class="tyre-col">
+                                        <div class="tyre ${d.tyre}">${d.tyre}</div>
+                                    </div>
+                                </div>
+                                <div class="expanded-details">
+                                    <div>Q1 <span>${d.q1}</span></div>
+                                    <div>Q2 <span>${d.q2}</span></div>
+                                    <div>Q3 <span>${d.q3}</span></div>
                                 </div>
                             `;
-                            leaderboard.appendChild(row);
+                            leaderboard.appendChild(container);
                         });
                     }
                 }
             } catch (error) {
                 console.error("Error pulling F1 stream data:", error);
-                // Don't nuke the board if the session just ended, only if we have NO data.
                 if (document.getElementById('leaderboard').innerHTML.includes("Bootstrapping")) {
                     document.getElementById('leaderboard').innerHTML = 
                         `<div class="loading" style="color:#a0a0b0;">Waiting for next session data...</div>`;
