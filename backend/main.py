@@ -34,7 +34,6 @@ HEADERS = {
 }
 
 # --- GLOBAL F1 LIVE MEMORY ---
-# F1 sends "deltas" (only what changes). We merge them here in real-time.
 LIVE_DATA = {
     "SessionInfo": {},
     "TimingData": {},
@@ -63,7 +62,6 @@ def update_dict(base, delta):
 def read_root():
     return {"status": "Brown GP SignalR Middleman is Live!"}
 
-# Basic API routes now read instantly from memory (No 403s!)
 @app.get("/api/session")
 def get_session():
     return LIVE_DATA.get("SessionInfo", {})
@@ -135,7 +133,6 @@ async def f1_signalr_client():
                 start_url = f"https://livetiming.formula1.com/signalr/start?clientProtocol=1.5&transport=webSockets&connectionToken={enc_token}&connectionData={enc_conn}"
                 await asyncio.to_thread(requests.get, start_url, headers=HEADERS, timeout=10)
 
-                # Subscribe to the live streams
                 sub = {
                     "H": "Streaming",
                     "M": "Subscribe",
@@ -145,7 +142,6 @@ async def f1_signalr_client():
                 await ws.send(json.dumps(sub))
                 print("SignalR Successfully Connected & Subscribed!")
 
-                # Listen and merge data forever
                 while True:
                     msg = await ws.recv()
                     if not msg: continue
@@ -156,7 +152,6 @@ async def f1_signalr_client():
                                 category = m['A'][0]
                                 payload = m['A'][1]
 
-                                # Decrypt GPS data
                                 if category == 'Position.z':
                                     payload = decode_f1_z(payload)
                                     category = 'Position'
@@ -168,6 +163,10 @@ async def f1_signalr_client():
                                         LIVE_DATA[category]['Messages'].extend(payload['Messages'])
                                 else:
                                     update_dict(LIVE_DATA.setdefault(category, {}), payload)
+                    
+                    # 🚨 THE FIX: Let Render breathe for 10 milliseconds so it doesn't kill the server! 🚨
+                    await asyncio.sleep(0.01)
+
         except Exception as e:
             print(f"SignalR Disconnected: {e}. Reconnecting in 5s...")
             await asyncio.sleep(5)
@@ -184,7 +183,6 @@ async def data_engine():
 
     while True:
         try:
-            # Read directly from global memory instead of polling!
             info = LIVE_DATA.get('SessionInfo', {})
             drivers_dict = LIVE_DATA.get('DriverList', {})
             timing_data = LIVE_DATA.get('TimingData', {}).get('Lines', {})
@@ -237,7 +235,6 @@ async def data_engine():
             tower_payload, map_drivers_payload, current_lap = [], [], 0
 
             if isinstance(drivers_dict, dict) and drivers_dict:
-                # Handle varying DriverList structures from F1
                 d_lines = drivers_dict if '1' in drivers_dict else drivers_dict.get('Lines', {})
 
                 for car_num, driver_info in d_lines.items():
@@ -330,7 +327,6 @@ async def data_engine():
         except Exception as e:
             pass 
 
-        # 10 Frames per second broadcast speed to your dashboard
         await asyncio.sleep(0.1)
 
 @app.on_event("startup")
