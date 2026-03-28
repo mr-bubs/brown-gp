@@ -129,7 +129,7 @@ async def f1_signalr_client():
 
             ws_url = f"wss://livetiming.formula1.com/signalr/connect?clientProtocol=1.5&transport=webSockets&connectionToken={enc_token}&connectionData={enc_conn}"
 
-            async with websockets.connect(ws_url, extra_headers=HEADERS) as ws:
+            async with websockets.connect(ws_url, additional_headers=HEADERS) as ws:
                 start_url = f"https://livetiming.formula1.com/signalr/start?clientProtocol=1.5&transport=webSockets&connectionToken={enc_token}&connectionData={enc_conn}"
                 await asyncio.to_thread(requests.get, start_url, headers=HEADERS, timeout=10)
 
