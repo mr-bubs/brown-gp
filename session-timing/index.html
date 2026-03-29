@@ -22,7 +22,7 @@
         .driver-container { border-bottom: 1px solid #2a2a35; cursor: pointer; transition: background-color 0.2s; }
         .driver-container:hover { background-color: #20202c; }
         .driver-container:last-child { border-bottom: none; }
-        .driver-container.out .driver-row { opacity: 0.4; } /* Grays out retired or eliminated cars */
+        .driver-container.out .driver-row { opacity: 0.4; } 
         .driver-row { display: grid; padding: 8px 0; align-items: center; font-size: 1.05rem; font-weight: 700; }
         .chevron { font-size: 0.65rem; color: #ffffff; margin-right: 6px; transition: transform 0.2s; display: inline-block; }
         .driver-container.open .chevron { transform: rotate(90deg); }
@@ -58,7 +58,9 @@
         const BACKEND_URL = "https://brown-gp.onrender.com";
         const driverLapHistory = {}; 
         
-        // The Official 2026 Grid
+        // 🚨 PERSISTENT MEMORY BANK (Saves Data if F1 Wipes it post-race) 🚨
+        const persistentMemory = {};
+        
         const FALLBACK_DRIVERS = {
             "1": { Tla: "NOR", TeamColour: "FF8000" }, "3": { Tla: "VER", TeamColour: "3671C6" },
             "5": { Tla: "BOR", TeamColour: "E50000" }, "6": { Tla: "HAD", TeamColour: "3671C6" },
@@ -124,25 +126,14 @@
                 if (sType.includes("practice")) mode = "PRACTICE";
                 if (sType.includes("qualifying") || sType.includes("shootout")) mode = "QUALI";
 
-                let maxLiveLaps = 0;
-                if (timingData && timingData.Lines) {
-                    Object.values(timingData.Lines).forEach(d => {
-                        const l = parseInt(d.NumberOfLaps || 0);
-                        if (l > maxLiveLaps) maxLiveLaps = l;
-                    });
-                }
-
                 if (sessionData && !sessionData.error) {
                     const meetingName = sessionData.Meeting?.Name || "Formula 1";
                     let sessionName = sessionData.Name || "Live Session";
                     if (mode === "QUALI" && timingData.SessionPart) sessionName += ` - Q${timingData.SessionPart}`;
 
                     const status = (sessionData.SessionStatus || "").toLowerCase();
-
-// "Finished", "Aborted", and "Finalised" are the true end-of-race flags.
-// We removed "Inactive" because F1's API randomly glitches to it mid-race.
-let isSessionEnded = ["finished", "aborted", "finalised"].includes(status);
-
+                    // Final banner fix applied here
+                    let isSessionEnded = ["finished", "aborted", "finalised"].includes(status);
 
                     const bannerEl = document.getElementById('session-ended-banner');
                     const headerEl = document.getElementById('session-header');
@@ -188,36 +179,55 @@ let isSessionEnded = ["finished", "aborted", "finalised"].includes(status);
                 const appLines = appData.Lines || {};
 
                 for (const driverNum of Object.keys(FALLBACK_DRIVERS)) {
+                    // Initialize Memory for this driver if it doesn't exist
+                    if (!persistentMemory[driverNum]) {
+                        persistentMemory[driverNum] = { tyre: 'U', age: 0, stops: 0, gap: '', int: '' };
+                    }
+
                     const driverInfo = (timingData.Lines || {})[driverNum] || {};
-                    
-                    // We no longer delete pitting drivers! Let them stay on the board.
                     let pos = parseInt(driverInfo.Position) || 99;
-                    const isRetired = driverInfo.Retired || false;
+                    const isRetired = driverInfo.Retired || driverInfo.Stopped || false;
 
                     const stintsData = appLines[driverNum]?.Stints;
-                    let tyreAge = 0;
-                    let currentTyre = 'U'; 
-                    let pitStops = 0;
-
+                    
+                    // Update Tyre Memory ONLY if F1 provides valid data. Otherwise, keep old data.
                     if (stintsData) {
                         const stints = Array.isArray(stintsData) ? stintsData : Object.values(stintsData);
                         const validStints = stints.filter(s => s && s.Compound);
                         if (validStints.length > 0) {
-                            pitStops = validStints.length - 1;
+                            persistentMemory[driverNum].stops = validStints.length - 1;
                             const lastStint = validStints[validStints.length - 1];
                             const compound = (lastStint.Compound || '').toUpperCase();
-                            if(compound.includes('SOFT')) currentTyre = 'S';
-                            else if(compound.includes('MEDIUM')) currentTyre = 'M';
-                            else if(compound.includes('HARD')) currentTyre = 'H';
-                            else if(compound.includes('INTERMEDIATE')) currentTyre = 'I';
-                            else if(compound.includes('WET')) currentTyre = 'W';
-                            tyreAge = lastStint.NewLaps || lastStint.TotalLaps || 0;
+                            if(compound.includes('SOFT')) persistentMemory[driverNum].tyre = 'S';
+                            else if(compound.includes('MEDIUM')) persistentMemory[driverNum].tyre = 'M';
+                            else if(compound.includes('HARD')) persistentMemory[driverNum].tyre = 'H';
+                            else if(compound.includes('INTERMEDIATE')) persistentMemory[driverNum].tyre = 'I';
+                            else if(compound.includes('WET')) persistentMemory[driverNum].tyre = 'W';
+                            persistentMemory[driverNum].age = lastStint.NewLaps || lastStint.TotalLaps || 0;
                         }
                     }
 
-                    const gap = driverInfo.GapToLeader || '';
-                    const interval = driverInfo.IntervalToPositionAhead?.Value || '';
+                    // Gap & Interval Memory Guard
+                    if (driverInfo.GapToLeader) persistentMemory[driverNum].gap = driverInfo.GapToLeader;
+                    if (driverInfo.IntervalToPositionAhead?.Value) persistentMemory[driverNum].int = driverInfo.IntervalToPositionAhead.Value;
+
+                    let gap = persistentMemory[driverNum].gap;
+                    let interval = persistentMemory[driverNum].int;
                     const bestLap = driverInfo.BestLapTime?.Value || 'NO TIME';
+
+                    // 🚨 THE GAP MATHEMATICS FIX (Strips the "L" flag so it sorts perfectly)
+                    let gapVal = 9999;
+                    if (pos === 1 || gap === '') {
+                        gapVal = 0;
+                    } else if (gap) {
+                        let cleanGap = gap.toUpperCase();
+                        if (cleanGap.includes('LAP') || cleanGap.includes('L')) {
+                            let num = parseFloat(cleanGap.replace(/[^\d.-]/g, '')) || 0;
+                            gapVal = 1000 + num; // Lapped cars go to the bottom
+                        } else {
+                            gapVal = parseFloat(cleanGap.replace(/[^\d.-]/g, '')) || 0;
+                        }
+                    }
 
                     const lastLap = driverInfo.LastLapTime?.Value;
                     if (mode === "PRACTICE") {
@@ -258,23 +268,22 @@ let isSessionEnded = ["finished", "aborted", "finalised"].includes(status);
                     }
 
                     activeDrivers.push({
-                        num: driverNum, pos: pos, name: finalTla, color: finalColor,
+                        num: driverNum, pos: pos, gapVal: gapVal, name: finalTla, color: finalColor,
                         best: bestLap, gap: gap, int: interval,
-                        tyre: currentTyre, age: tyreAge, stops: pitStops,
+                        tyre: persistentMemory[driverNum].tyre, age: persistentMemory[driverNum].age, stops: persistentMemory[driverNum].stops,
                         q1: q1, q2: q2, q3: q3, s1: sectors[0], s2: sectors[1], s3: sectors[2],
                         out: isEliminated || isRetired
                     });
                 }
 
                 if (activeDrivers.length > 0) {
-                    // 🚨 SORT PURELY BY OFFICIAL F1 POSITION NUMBER! NO MORE NaN BREAKAGES!
-                    activeDrivers.sort((a, b) => a.pos - b.pos);
+                    // 🚨 SORT PURELY BY GAP VALUE: Bypasses F1 dropping the "Position" entirely!
+                    activeDrivers.sort((a, b) => a.gapVal - b.gapVal);
 
+                    let visualPos = 1;
                     leaderboard.innerHTML = ''; 
+                    
                     activeDrivers.forEach(d => {
-                        // Hide drivers who genuinely haven't joined the race yet (pos 99)
-                        if (d.pos === 99 && !d.out) return;
-
                         const container = document.createElement('div');
                         container.className = `driver-container ${d.out ? 'out' : ''}`;
                         container.dataset.driver = d.name; 
@@ -283,14 +292,11 @@ let isSessionEnded = ["finished", "aborted", "finalised"].includes(status);
 
                         let mainRow = '';
                         let expandedRow = '';
-                        
-                        // Let F1's official position drive the display
-                        const displayPos = d.pos === 99 ? 'OUT' : d.pos;
 
                         if (mode === "RACE") {
                             mainRow = `
                                 <div class="driver-row grid-race">
-                                    <div class="pos">${displayPos}</div>
+                                    <div class="pos">${visualPos++}</div>
                                     <div class="driver" style="border-color: ${d.color};">${d.name}</div>
                                     <div class="tyre-col">${d.age} <div class="tyre ${d.tyre}">${d.tyre === 'U' ? '' : d.tyre}</div></div>
                                     <div class="data-mono">${d.int}</div>
@@ -301,7 +307,7 @@ let isSessionEnded = ["finished", "aborted", "finalised"].includes(status);
                         } else {
                             mainRow = `
                                 <div class="driver-row grid-quali">
-                                    <div class="pos"><span class="chevron">▶</span> ${displayPos}</div>
+                                    <div class="pos"><span class="chevron">▶</span> ${visualPos++}</div>
                                     <div class="driver" style="border-color: ${d.color};">${d.name}</div>
                                     <div class="tyre-col">${d.age} <div class="tyre ${d.tyre}">${d.tyre === 'U' ? '' : d.tyre}</div></div>
                                     <div class="data-mono gap">${d.gap}</div>
