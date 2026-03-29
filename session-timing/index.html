@@ -138,8 +138,11 @@
                     if (mode === "QUALI" && timingData.SessionPart) sessionName += ` - Q${timingData.SessionPart}`;
 
                     const status = (sessionData.SessionStatus || "").toLowerCase();
-                    let isSessionEnded = ["inactive", "finished", "aborted", "finalised"].includes(status);
-                    if (mode === "RACE" && maxLiveLaps > 0 && maxLiveLaps < 75) isSessionEnded = false; 
+
+// "Finished", "Aborted", and "Finalised" are the true end-of-race flags.
+// We removed "Inactive" because F1's API randomly glitches to it mid-race.
+let isSessionEnded = ["finished", "aborted", "finalised"].includes(status);
+
 
                     const bannerEl = document.getElementById('session-ended-banner');
                     const headerEl = document.getElementById('session-header');
