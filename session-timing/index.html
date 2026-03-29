@@ -37,8 +37,11 @@
         .pos { display: flex; align-items: center; padding-left: 8px; color: #ffffff; font-size: 0.95rem;}
         .driver { display: flex; align-items: center; border-left: 4px solid; padding-left: 8px; height: 100%; letter-spacing: 1px; }
         .tyre-col { display: flex; align-items: center; gap: 4px; font-size: 0.85rem; color: #d0d0d0;}
+        
+        /* Added a 'U' class for unknown tyres if F1 drops the compound string */
         .tyre { width: 20px; height: 20px; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 0.75rem; font-weight: bold; border: 2px solid; background: transparent; color: white; }
-        .tyre.S { border-color: #ff2a2a; color: #ff2a2a; } .tyre.M { border-color: #ffe600; color: #ffe600; } .tyre.H { border-color: #ffffff; color: #ffffff; } .tyre.I { border-color: #00e640; color: #00e640; } .tyre.W { border-color: #00aaff; color: #00aaff; } 
+        .tyre.S { border-color: #ff2a2a; color: #ff2a2a; } .tyre.M { border-color: #ffe600; color: #ffe600; } .tyre.H { border-color: #ffffff; color: #ffffff; } .tyre.I { border-color: #00e640; color: #00e640; } .tyre.W { border-color: #00aaff; color: #00aaff; } .tyre.U { border-color: #555555; color: #a0a0b0; }
+        
         .data-mono { font-family: 'Roboto Mono', monospace; font-size: 0.95rem; }
         .time-best { color: #00e640; }
         .gap { color: #ffffff; }
@@ -58,30 +61,18 @@
         const BACKEND_URL = "https://brown-gp.onrender.com";
         const driverLapHistory = {}; 
         
-        // 🚨 2026 OFFICIAL GRID FALLBACK (CORRECT NUMBERS & NEW TEAM COLORS) 🚨
         const FALLBACK_DRIVERS = {
-            "1": { Tla: "NOR", TeamColour: "FF8000" }, // McLaren (Reigning Champ)
-            "3": { Tla: "VER", TeamColour: "3671C6" }, // Red Bull (Switched to #3)
-            "5": { Tla: "BOR", TeamColour: "E50000" }, // Audi
-            "6": { Tla: "HAD", TeamColour: "3671C6" }, // Red Bull
-            "10": { Tla: "GAS", TeamColour: "0093CC" }, // Alpine
-            "11": { Tla: "PER", TeamColour: "FFB800" }, // Cadillac
-            "12": { Tla: "ANT", TeamColour: "27F4D2" }, // Mercedes
-            "14": { Tla: "ALO", TeamColour: "229971" }, // Aston Martin
-            "16": { Tla: "LEC", TeamColour: "E8002D" }, // Ferrari
-            "18": { Tla: "STR", TeamColour: "229971" }, // Aston Martin
-            "23": { Tla: "ALB", TeamColour: "64C4FF" }, // Williams
-            "27": { Tla: "HUL", TeamColour: "E50000" }, // Audi
-            "30": { Tla: "LAW", TeamColour: "6692FF" }, // Racing Bulls
-            "31": { Tla: "OCO", TeamColour: "B6BABD" }, // Haas
-            "41": { Tla: "LIN", TeamColour: "6692FF" }, // Racing Bulls
-            "43": { Tla: "COL", TeamColour: "0093CC" }, // Alpine
-            "44": { Tla: "HAM", TeamColour: "E8002D" }, // Ferrari
-            "55": { Tla: "SAI", TeamColour: "64C4FF" }, // Williams
-            "63": { Tla: "RUS", TeamColour: "27F4D2" }, // Mercedes
-            "77": { Tla: "BOT", TeamColour: "FFB800" }, // Cadillac
-            "81": { Tla: "PIA", TeamColour: "FF8000" }, // McLaren
-            "87": { Tla: "BEA", TeamColour: "B6BABD" }  // Haas
+            "1": { Tla: "NOR", TeamColour: "FF8000" }, "3": { Tla: "VER", TeamColour: "3671C6" },
+            "5": { Tla: "BOR", TeamColour: "E50000" }, "6": { Tla: "HAD", TeamColour: "3671C6" },
+            "10": { Tla: "GAS", TeamColour: "0093CC" }, "11": { Tla: "PER", TeamColour: "FFB800" },
+            "12": { Tla: "ANT", TeamColour: "27F4D2" }, "14": { Tla: "ALO", TeamColour: "229971" },
+            "16": { Tla: "LEC", TeamColour: "E8002D" }, "18": { Tla: "STR", TeamColour: "229971" },
+            "23": { Tla: "ALB", TeamColour: "64C4FF" }, "27": { Tla: "HUL", TeamColour: "E50000" },
+            "30": { Tla: "LAW", TeamColour: "6692FF" }, "31": { Tla: "OCO", TeamColour: "B6BABD" },
+            "41": { Tla: "LIN", TeamColour: "6692FF" }, "43": { Tla: "COL", TeamColour: "0093CC" },
+            "44": { Tla: "HAM", TeamColour: "E8002D" }, "55": { Tla: "SAI", TeamColour: "64C4FF" },
+            "63": { Tla: "RUS", TeamColour: "27F4D2" }, "77": { Tla: "BOT", TeamColour: "FFB800" },
+            "81": { Tla: "PIA", TeamColour: "FF8000" }, "87": { Tla: "BEA", TeamColour: "B6BABD" }
         };
         
         let seenMessages = new Set();
@@ -150,10 +141,7 @@
 
                     const status = (sessionData.SessionStatus || "").toLowerCase();
                     let isSessionEnded = ["inactive", "finished", "aborted", "finalised"].includes(status);
-                    
-                    if (mode === "RACE" && maxLiveLaps > 0 && maxLiveLaps < 75) {
-                        isSessionEnded = false; 
-                    }
+                    if (mode === "RACE" && maxLiveLaps > 0 && maxLiveLaps < 75) isSessionEnded = false; 
 
                     const bannerEl = document.getElementById('session-ended-banner');
                     const headerEl = document.getElementById('session-header');
@@ -194,155 +182,174 @@
                 const openContainers = document.querySelectorAll('.driver-container.open');
                 const openNames = Array.from(openContainers).map(c => c.dataset.driver);
 
-                if (timingData && timingData.Lines) {
-                    let activeDrivers = [];
-                    const driverProfiles = driverData.Lines || driverData || {};
-                    const appLines = appData.Lines || {};
+                let activeDrivers = [];
+                const driverProfiles = driverData.Lines || driverData || {};
+                const appLines = appData.Lines || {};
 
-                    for (const [driverNum, driverInfo] of Object.entries(timingData.Lines)) {
-                        if (!driverInfo.Position || isNaN(driverInfo.Position)) continue;
-                        const pos = parseInt(driverInfo.Position);
+                // 🚨 GOD MODE: Loop through our fallback list to guarantee every driver is checked, even if F1's feed drops them!
+                for (const driverNum of Object.keys(FALLBACK_DRIVERS)) {
+                    const driverInfo = (timingData.Lines || {})[driverNum] || {};
+                    
+                    if (driverInfo.Retired || driverInfo.Stopped) continue;
 
-                        const stintsData = appLines[driverNum]?.Stints;
-                        let tyreAge = 0;
-                        let currentTyre = 'S';
-                        let pitStops = 0;
+                    let pos = parseInt(driverInfo.Position) || 99;
 
-                        if (stintsData) {
-                            const stints = Array.isArray(stintsData) ? stintsData : Object.values(stintsData);
-                            if (stints.length > 0) {
-                                pitStops = Math.max(0, stints.length - 1);
-                                const lastStint = stints[stints.length - 1];
-                                const compound = lastStint.Compound ? lastStint.Compound.toUpperCase() : '';
-                                if(compound === 'SOFT') currentTyre = 'S';
-                                if(compound === 'MEDIUM') currentTyre = 'M';
-                                if(compound === 'HARD') currentTyre = 'H';
-                                if(compound === 'INTERMEDIATE') currentTyre = 'I';
-                                if(compound === 'WET') currentTyre = 'W';
-                                tyreAge = lastStint.NewLaps || lastStint.TotalLaps || 0;
+                    // 🚨 BULLETPROOF STINTS (Fixes the Pitstop math bug)
+                    const stintsData = appLines[driverNum]?.Stints;
+                    let tyreAge = 0;
+                    let currentTyre = 'U'; // U for Unknown if F1 drops it
+                    let pitStops = 0;
+
+                    if (stintsData) {
+                        const stintKeys = Object.keys(stintsData).filter(k => !isNaN(k)).map(Number);
+                        if (stintKeys.length > 0) {
+                            // The highest Key ID is equal to the Pitstop count!
+                            pitStops = Math.max(...stintKeys);
+                            const lastStint = stintsData[pitStops];
+                            
+                            if (lastStint && lastStint.Compound) {
+                                const compound = lastStint.Compound.toUpperCase();
+                                if(compound.includes('SOFT')) currentTyre = 'S';
+                                else if(compound.includes('MEDIUM')) currentTyre = 'M';
+                                else if(compound.includes('HARD')) currentTyre = 'H';
+                                else if(compound.includes('INTERMEDIATE')) currentTyre = 'I';
+                                else if(compound.includes('WET')) currentTyre = 'W';
                             }
+                            if (lastStint) tyreAge = lastStint.NewLaps || lastStint.TotalLaps || 0;
                         }
-
-                        const gap = driverInfo.GapToLeader || '';
-                        const interval = driverInfo.IntervalToPositionAhead?.Value || '';
-                        const bestLap = driverInfo.BestLapTime?.Value || 'NO TIME';
-                        
-                        const lastLap = driverInfo.LastLapTime?.Value;
-                        if (mode === "PRACTICE") {
-                            if (!driverLapHistory[driverNum]) driverLapHistory[driverNum] = [];
-                            if (lastLap && driverLapHistory[driverNum][0] !== lastLap) {
-                                driverLapHistory[driverNum].unshift(lastLap);
-                                if (driverLapHistory[driverNum].length > 5) driverLapHistory[driverNum].pop();
-                            }
-                        }
-
-                        let q1 = '--', q2 = '--', q3 = '--';
-                        if (driverInfo.BestLapTimes && Array.isArray(driverInfo.BestLapTimes)) {
-                            if (driverInfo.BestLapTimes.length > 0) q1 = driverInfo.BestLapTimes[0].Value || '--';
-                            if (driverInfo.BestLapTimes.length > 1) q2 = driverInfo.BestLapTimes[1].Value || '--';
-                            if (driverInfo.BestLapTimes.length > 2) q3 = driverInfo.BestLapTimes[2].Value || '--';
-                        }
-
-                        const sData = driverInfo.Sectors || [];
-                        const sectors = [0,1,2].map(i => {
-                            if (!sData[i]) return { val: '--', class: '' };
-                            let cls = '';
-                            if (sData[i].OverallFastest) cls = 'purple';
-                            else if (sData[i].PersonalFastest) cls = 'green';
-                            else cls = 'yellow';
-                            return { val: sData[i].Value || '--', class: cls };
-                        });
-
-                        // 🚨 BULLETPROOF FALLBACK MERGE (WITH NEW 2026 GRID) 🚨
-                        const apiProfile = driverProfiles[driverNum] || {};
-                        const fallbackProfile = FALLBACK_DRIVERS[driverNum] || {};
-                        
-                        const finalTla = apiProfile.Tla || fallbackProfile.Tla || "UNK";
-                        const finalColor = '#' + (apiProfile.TeamColour || fallbackProfile.TeamColour || 'a0a0b0').replace('##', '#');
-
-                        let isEliminated = false;
-                        if (mode === "QUALI" && timingData.SessionPart) {
-                            const part = parseInt(timingData.SessionPart);
-                            if (part === 1 && pos > 15) isEliminated = true;
-                            if (part === 2 && pos > 10) isEliminated = true;
-                        }
-
-                        activeDrivers.push({
-                            num: driverNum, pos: pos, name: finalTla,
-                            color: finalColor,
-                            best: bestLap, gap: gap, int: interval,
-                            tyre: currentTyre, age: tyreAge, stops: pitStops,
-                            q1: q1, q2: q2, q3: q3,
-                            s1: sectors[0], s2: sectors[1], s3: sectors[2],
-                            eliminated: isEliminated
-                        });
                     }
 
-                    if (activeDrivers.length > 0) {
-                        leaderboard.innerHTML = ''; 
-                        activeDrivers.sort((a, b) => a.pos - b.pos).forEach(d => {
-                            const container = document.createElement('div');
-                            container.className = `driver-container ${d.eliminated ? 'eliminated' : ''}`;
-                            container.dataset.driver = d.name; 
-                            if (openNames.includes(d.name)) container.classList.add('open');
-                            container.onclick = function() { this.classList.toggle('open'); };
+                    const gap = driverInfo.GapToLeader || '';
+                    const interval = driverInfo.IntervalToPositionAhead?.Value || '';
+                    const bestLap = driverInfo.BestLapTime?.Value || 'NO TIME';
 
-                            let mainRow = '';
-                            let expandedRow = '';
-
-                            if (mode === "RACE") {
-                                mainRow = `
-                                    <div class="driver-row grid-race">
-                                        <div class="pos">${d.pos}</div>
-                                        <div class="driver" style="border-color: ${d.color};">${d.name}</div>
-                                        <div class="tyre-col">${d.age} <div class="tyre ${d.tyre}">${d.tyre}</div></div>
-                                        <div class="data-mono">${d.int}</div>
-                                        <div class="data-mono gap">${d.gap}</div>
-                                        <div class="data-mono" style="text-align:center;">${d.stops}</div>
-                                    </div>`;
-                                expandedRow = `<div class="expanded-row"><div>Race view active.</div></div>`;
-                            } else {
-                                mainRow = `
-                                    <div class="driver-row grid-quali">
-                                        <div class="pos"><span class="chevron">▶</span> ${d.pos}</div>
-                                        <div class="driver" style="border-color: ${d.color};">${d.name}</div>
-                                        <div class="tyre-col">${d.age} <div class="tyre ${d.tyre}">${d.tyre}</div></div>
-                                        <div class="data-mono gap">${d.gap}</div>
-                                        <div class="data-mono time-best">${d.best}</div>
-                                    </div>`;
-                                
-                                const sectorsUI = `
-                                    <div class="expanded-row">
-                                        <div>S1 <span class="${d.s1.class}">${d.s1.val}</span></div>
-                                        <div>S2 <span class="${d.s2.class}">${d.s2.val}</span></div>
-                                        <div>S3 <span class="${d.s3.class}">${d.s3.val}</span></div>
-                                    </div>`;
-
-                                if (mode === "QUALI") {
-                                    expandedRow = `
-                                        ${sectorsUI}
-                                        <div class="expanded-row" style="margin-top: 5px;">
-                                            <div>Q1 <span>${d.q1}</span></div>
-                                            <div>Q2 <span>${d.q2}</span></div>
-                                            <div>Q3 <span>${d.q3}</span></div>
-                                        </div>`;
-                                } else if (mode === "PRACTICE") {
-                                    const h = driverLapHistory[d.num] || [];
-                                    const historyHTML = h.length > 0 ? h.map(lap => `<span>${lap}</span>`).join('') : `<span>Waiting for laps...</span>`;
-                                    expandedRow = `
-                                        ${sectorsUI}
-                                        <div style="margin-top: 5px; text-align:center; color:#fff;">
-                                            <span style="color:#a0a0b0; font-size:0.75rem; display:block;">PAST 5 LAPS (LIVE)</span>
-                                            <div style="display:flex; justify-content:space-between; width:100%; padding-top:4px;">
-                                                ${historyHTML}
-                                            </div>
-                                        </div>`;
-                                }
-                            }
-                            container.innerHTML = mainRow + `<div class="expanded-details">${expandedRow}</div>`;
-                            leaderboard.appendChild(container);
-                        });
+                    // 🚨 MATHEMATICAL POSITION CALCULATION
+                    let gapVal = 9999;
+                    if (gap) {
+                        if (gap.includes('LAP')) gapVal = 1000 + parseInt(gap);
+                        else gapVal = parseFloat(gap.replace('+', '')) || 0;
+                    } else if (pos === 1) {
+                        gapVal = 0;
+                    } else if (pos !== 99) {
+                        gapVal = pos * 100; // Emergency fallback sorting
                     }
+                    
+                    const lastLap = driverInfo.LastLapTime?.Value;
+                    if (mode === "PRACTICE") {
+                        if (!driverLapHistory[driverNum]) driverLapHistory[driverNum] = [];
+                        if (lastLap && driverLapHistory[driverNum][0] !== lastLap) {
+                            driverLapHistory[driverNum].unshift(lastLap);
+                            if (driverLapHistory[driverNum].length > 5) driverLapHistory[driverNum].pop();
+                        }
+                    }
+
+                    let q1 = '--', q2 = '--', q3 = '--';
+                    if (driverInfo.BestLapTimes && Array.isArray(driverInfo.BestLapTimes)) {
+                        if (driverInfo.BestLapTimes.length > 0) q1 = driverInfo.BestLapTimes[0].Value || '--';
+                        if (driverInfo.BestLapTimes.length > 1) q2 = driverInfo.BestLapTimes[1].Value || '--';
+                        if (driverInfo.BestLapTimes.length > 2) q3 = driverInfo.BestLapTimes[2].Value || '--';
+                    }
+
+                    const sData = driverInfo.Sectors || [];
+                    const sectors = [0,1,2].map(i => {
+                        if (!sData[i]) return { val: '--', class: '' };
+                        let cls = '';
+                        if (sData[i].OverallFastest) cls = 'purple';
+                        else if (sData[i].PersonalFastest) cls = 'green';
+                        else cls = 'yellow';
+                        return { val: sData[i].Value || '--', class: cls };
+                    });
+
+                    const apiProfile = driverProfiles[driverNum] || {};
+                    const fallbackProfile = FALLBACK_DRIVERS[driverNum] || {};
+                    const finalTla = apiProfile.Tla || fallbackProfile.Tla || "UNK";
+                    const finalColor = '#' + (apiProfile.TeamColour || fallbackProfile.TeamColour || 'a0a0b0').replace('##', '#');
+
+                    let isEliminated = false;
+                    if (mode === "QUALI" && timingData.SessionPart) {
+                        const part = parseInt(timingData.SessionPart);
+                        if (part === 1 && pos > 15) isEliminated = true;
+                        if (part === 2 && pos > 10) isEliminated = true;
+                    }
+
+                    activeDrivers.push({
+                        num: driverNum, pos: pos, name: finalTla, color: finalColor,
+                        best: bestLap, gap: gap, int: interval, gapVal: gapVal,
+                        tyre: currentTyre, age: tyreAge, stops: pitStops,
+                        q1: q1, q2: q2, q3: q3, s1: sectors[0], s2: sectors[1], s3: sectors[2],
+                        eliminated: isEliminated
+                    });
+                }
+
+                if (activeDrivers.length > 0) {
+                    // Sort mathematically by Gap to Leader to fix missing F1 positions
+                    activeDrivers.sort((a, b) => a.gapVal - b.gapVal);
+                    
+                    let visualPos = 1;
+
+                    leaderboard.innerHTML = ''; 
+                    activeDrivers.forEach(d => {
+                        const container = document.createElement('div');
+                        container.className = `driver-container ${d.eliminated ? 'eliminated' : ''}`;
+                        container.dataset.driver = d.name; 
+                        if (openNames.includes(d.name)) container.classList.add('open');
+                        container.onclick = function() { this.classList.toggle('open'); };
+
+                        let mainRow = '';
+                        let expandedRow = '';
+
+                        if (mode === "RACE") {
+                            mainRow = `
+                                <div class="driver-row grid-race">
+                                    <div class="pos">${visualPos++}</div>
+                                    <div class="driver" style="border-color: ${d.color};">${d.name}</div>
+                                    <div class="tyre-col">${d.age} <div class="tyre ${d.tyre}">${d.tyre === 'U' ? '' : d.tyre}</div></div>
+                                    <div class="data-mono">${d.int}</div>
+                                    <div class="data-mono gap">${d.gap}</div>
+                                    <div class="data-mono" style="text-align:center;">${d.stops}</div>
+                                </div>`;
+                            expandedRow = `<div class="expanded-row"><div>Race view active.</div></div>`;
+                        } else {
+                            mainRow = `
+                                <div class="driver-row grid-quali">
+                                    <div class="pos"><span class="chevron">▶</span> ${visualPos++}</div>
+                                    <div class="driver" style="border-color: ${d.color};">${d.name}</div>
+                                    <div class="tyre-col">${d.age} <div class="tyre ${d.tyre}">${d.tyre === 'U' ? '' : d.tyre}</div></div>
+                                    <div class="data-mono gap">${d.gap}</div>
+                                    <div class="data-mono time-best">${d.best}</div>
+                                </div>`;
+                            
+                            const sectorsUI = `
+                                <div class="expanded-row">
+                                    <div>S1 <span class="${d.s1.class}">${d.s1.val}</span></div>
+                                    <div>S2 <span class="${d.s2.class}">${d.s2.val}</span></div>
+                                    <div>S3 <span class="${d.s3.class}">${d.s3.val}</span></div>
+                                </div>`;
+
+                            if (mode === "QUALI") {
+                                expandedRow = `
+                                    ${sectorsUI}
+                                    <div class="expanded-row" style="margin-top: 5px;">
+                                        <div>Q1 <span>${d.q1}</span></div>
+                                        <div>Q2 <span>${d.q2}</span></div>
+                                        <div>Q3 <span>${d.q3}</span></div>
+                                    </div>`;
+                            } else if (mode === "PRACTICE") {
+                                const h = driverLapHistory[d.num] || [];
+                                const historyHTML = h.length > 0 ? h.map(lap => `<span>${lap}</span>`).join('') : `<span>Waiting for laps...</span>`;
+                                expandedRow = `
+                                    ${sectorsUI}
+                                    <div style="margin-top: 5px; text-align:center; color:#fff;">
+                                        <span style="color:#a0a0b0; font-size:0.75rem; display:block;">PAST 5 LAPS (LIVE)</span>
+                                        <div style="display:flex; justify-content:space-between; width:100%; padding-top:4px;">
+                                            ${historyHTML}
+                                        </div>
+                                    </div>`;
+                            }
+                        }
+                        container.innerHTML = mainRow + `<div class="expanded-details">${expandedRow}</div>`;
+                        leaderboard.appendChild(container);
+                    });
                 }
             } catch (error) { console.error("Error pulling F1 stream data:", error); }
         }
