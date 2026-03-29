@@ -58,21 +58,18 @@
         const BACKEND_URL = "https://brown-gp.onrender.com";
         const driverLapHistory = {}; 
         
-        // 🚨 THE REQUIRED FRONTEND SAFETY NET 🚨
+        // 🚨 2026 FULL FALLBACK ROSTER 🚨
         const FALLBACK_DRIVERS = {
             "1": { Tla: "VER", TeamColour: "3671C6" }, "11": { Tla: "PER", TeamColour: "3671C6" },
-            "16": { Tla: "LEC", TeamColour: "E8002D" }, "55": { Tla: "SAI", TeamColour: "64C4FF" },
+            "16": { Tla: "LEC", TeamColour: "E8002D" }, "44": { Tla: "HAM", TeamColour: "E8002D" },
             "4": { Tla: "NOR", TeamColour: "FF8000" }, "81": { Tla: "PIA", TeamColour: "FF8000" },
             "63": { Tla: "RUS", TeamColour: "27F4D2" }, "12": { Tla: "ANT", TeamColour: "27F4D2" },
             "14": { Tla: "ALO", TeamColour: "229971" }, "18": { Tla: "STR", TeamColour: "229971" },
-            "10": { Tla: "GAS", TeamColour: "0093CC" }, "31": { Tla: "OCO", TeamColour: "B6BABD" },
-            "23": { Tla: "ALB", TeamColour: "64C4FF" }, "43": { Tla: "COL", TeamColour: "64C4FF" },
-            "22": { Tla: "TSU", TeamColour: "6692FF" }, "30": { Tla: "LAW", TeamColour: "6692FF" },
-            "77": { Tla: "BOT", TeamColour: "52E252" }, "24": { Tla: "ZHO", TeamColour: "52E252" },
-            "20": { Tla: "MAG", TeamColour: "B6BABD" }, "27": { Tla: "HUL", TeamColour: "B6BABD" },
-            "38": { Tla: "BEA", TeamColour: "B6BABD" }, "82": { Tla: "HAD", TeamColour: "6692FF" },
-            "5": { Tla: "LIN", TeamColour: "27F4D2" }, "8": { Tla: "BOR", TeamColour: "B6BABD" },
-            "44": { Tla: "HAM", TeamColour: "E8002D" }, "61": { Tla: "DOO", TeamColour: "0093CC" }
+            "10": { Tla: "GAS", TeamColour: "0093CC" }, "7": { Tla: "DOO", TeamColour: "0093CC" }, "61": { Tla: "DOO", TeamColour: "0093CC" },
+            "23": { Tla: "ALB", TeamColour: "64C4FF" }, "55": { Tla: "SAI", TeamColour: "64C4FF" }, "43": { Tla: "COL", TeamColour: "64C4FF" },
+            "22": { Tla: "TSU", TeamColour: "6692FF" }, "30": { Tla: "LAW", TeamColour: "6692FF" }, "82": { Tla: "HAD", TeamColour: "6692FF" },
+            "27": { Tla: "HUL", TeamColour: "52E252" }, "5": { Tla: "BOR", TeamColour: "52E252" }, "8": { Tla: "BOR", TeamColour: "52E252" },
+            "31": { Tla: "OCO", TeamColour: "B6BABD" }, "87": { Tla: "BEA", TeamColour: "B6BABD" }, "38": { Tla: "BEA", TeamColour: "B6BABD" }
         };
         
         let seenMessages = new Set();
@@ -244,8 +241,13 @@
                             return { val: sData[i].Value || '--', class: cls };
                         });
 
-                        // 🚨 USES THE FALLBACK IF F1 API IS BLANK 🚨
-                        const profile = driverProfiles[driverNum] || FALLBACK_DRIVERS[driverNum] || {};
+                        // 🚨 BULLETPROOF FALLBACK MERGE 🚨
+                        const apiProfile = driverProfiles[driverNum] || {};
+                        const fallbackProfile = FALLBACK_DRIVERS[driverNum] || {};
+                        
+                        // If F1 gives us an object but it's missing the Tla, default to the fallback immediately
+                        const finalTla = apiProfile.Tla || fallbackProfile.Tla || "UNK";
+                        const finalColor = '#' + (apiProfile.TeamColour || fallbackProfile.TeamColour || 'a0a0b0').replace('##', '#');
 
                         let isEliminated = false;
                         if (mode === "QUALI" && timingData.SessionPart) {
@@ -255,8 +257,8 @@
                         }
 
                         activeDrivers.push({
-                            num: driverNum, pos: pos, name: profile.Tla || "UNK",
-                            color: '#' + (profile.TeamColour || 'a0a0b0').replace('##', '#'),
+                            num: driverNum, pos: pos, name: finalTla,
+                            color: finalColor,
                             best: bestLap, gap: gap, int: interval,
                             tyre: currentTyre, age: tyreAge, stops: pitStops,
                             q1: q1, q2: q2, q3: q3,
