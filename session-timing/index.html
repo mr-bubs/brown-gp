@@ -39,13 +39,12 @@
             font-size: 0.9rem;
             max-width: 320px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.6);
-            border-left: 5px solid #ffcc00; /* Yellow accent for visibility */
+            border-left: 5px solid #ffcc00;
             animation: slideIn 0.3s ease-out forwards;
             letter-spacing: 0.5px;
             line-height: 1.3;
         }
 
-        /* Smooth slide in and fade out animations */
         @keyframes slideIn {
             from { transform: translateX(100%); opacity: 0; }
             to { transform: translateX(0); opacity: 1; }
@@ -195,7 +194,7 @@
         
         // --- RACE CONTROL MESSAGE ENGINE ---
         let seenMessages = new Set();
-        let isFirstLoad = true; // Prevents spamming old messages when you open the page
+        let isFirstLoad = true; 
         const triggerKeywords = ["SAFETY CAR", "YELLOW", "PENALTY", "INVESTIGATED", "INVESTIGATION", "BLACK AND WHITE", "FLAG"];
 
         function showToast(message) {
@@ -204,19 +203,16 @@
             toast.className = 'toast';
             toast.innerText = message;
 
-            // Using prepend so the newest message is always at the TOP, pushing others down
             container.prepend(toast);
 
-            // Remove it after 2.5 seconds
             setTimeout(() => {
                 toast.classList.add('fade-out');
-                setTimeout(() => toast.remove(), 300); // Waits for fade animation to end
+                setTimeout(() => toast.remove(), 300);
             }, 2500);
         }
 
         async function fetchLiveTiming() {
             try {
-                // Fetch all 5 data endpoints!
                 const [sessionRes, timingRes, driverRes, appRes, msgRes] = await Promise.all([
                     fetch(`${BACKEND_URL}/api/session`),
                     fetch(`${BACKEND_URL}/api/timing`),
@@ -234,14 +230,11 @@
                 // --- PROCESS RACE CONTROL MESSAGES ---
                 if (msgData && msgData.Messages) {
                     msgData.Messages.forEach(m => {
-                        // Create a unique ID for the message using its F1 timestamp + text
                         const uniqueId = m.Utc + m.Message;
                         
                         if (!seenMessages.has(uniqueId)) {
                             seenMessages.add(uniqueId);
                             
-                            // Only trigger toast if it's NOT the first time we opened the page, 
-                            // and if it contains one of your targeted keywords.
                             if (!isFirstLoad) {
                                 const text = (m.Message || "").toUpperCase();
                                 if (triggerKeywords.some(kw => text.includes(kw))) {
@@ -251,7 +244,7 @@
                         }
                     });
                 }
-                isFirstLoad = false; // Initial dump complete. Future messages will trigger toasts!
+                isFirstLoad = false; 
 
                 // --- PROCESS SESSION MODE & HEADERS ---
                 const sType = (sessionData.Type || "Race").toLowerCase();
@@ -267,9 +260,9 @@
                         sessionName += ` - Q${timingData.SessionPart}`;
                     }
 
+                    // 🚨 REMOVED THE GLITCHY ARCHIVESTATUS CHECK! 🚨
                     const status = (sessionData.SessionStatus || "").toLowerCase();
-                    const archiveStatus = (sessionData.ArchiveStatus?.Status || "").toLowerCase();
-                    const isSessionEnded = ["inactive", "finished", "aborted", "finalised"].includes(status) || ["generating", "complete"].includes(archiveStatus);
+                    const isSessionEnded = ["inactive", "finished", "aborted", "finalised"].includes(status);
                     
                     const bannerEl = document.getElementById('session-ended-banner');
                     const headerEl = document.getElementById('session-header');
@@ -465,6 +458,8 @@
         }
 
         fetchLiveTiming();
+        
+        // 🚨 INTERVAL SET TO 3 SECONDS FOR FAST LIVE UPDATES 🚨
         setInterval(fetchLiveTiming, 3000);
     </script>
 </body>
