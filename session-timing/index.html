@@ -3,26 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Brown GP - Live Timing</title>
+    <title>Brown GP - Pro Timing</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Titillium+Web:wght@400;600;700&family=Roboto+Mono:wght@500&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Titillium+Web:wght@400;600;700&family=Roboto+Mono:wght@500;700&display=swap');
 
         body {
             background-color: #111111;
             color: #ffffff;
             font-family: 'Titillium Web', sans-serif;
             margin: 0;
-            padding: 40px 20px;
+            padding: 20px 10px;
             display: flex;
             flex-direction: column;
             align-items: center;
         }
 
-        /* Header Styles */
         .header {
             background-color: #15151e;
             color: white;
-            padding: 15px 20px;
+            padding: 15px 10px;
             font-size: 1.1rem;
             font-weight: 700;
             text-transform: uppercase;
@@ -31,10 +30,9 @@
             margin-bottom: 0;
             text-align: center;
             width: 100%;
-            max-width: 450px;
+            max-width: 500px;
             box-sizing: border-box;
             letter-spacing: 0.5px;
-            transition: border-color 0.3s ease;
         }
 
         .session-ended-banner {
@@ -45,136 +43,109 @@
             text-align: center;
             padding: 6px 0;
             width: 100%;
-            max-width: 450px;
+            max-width: 500px;
             letter-spacing: 1px;
-            display: none; /* Hidden by default */
+            display: none; 
         }
 
         .timing-tower {
             background-color: #1a1a24;
             width: 100%;
-            max-width: 450px;
+            max-width: 500px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.8);
             border-radius: 0 0 8px 8px;
             overflow: hidden;
         }
 
-        /* Grid Layout */
+        /* Dynamic Grid Layouts */
+        .grid-quali, .grid-practice { grid-template-columns: 50px 70px 50px 70px 1fr; }
+        .grid-race { grid-template-columns: 50px 70px 50px 65px 65px 1fr; }
+
         .tower-header {
             display: grid;
-            grid-template-columns: 65px 80px 40px 1fr;
             background-color: #242430;
             padding: 12px 0;
-            font-size: 0.85rem;
+            font-size: 0.75rem;
             font-weight: 600;
             color: #a0a0b0;
             border-bottom: 2px solid #e10600;
         }
 
-        .tower-header > div { display: flex; align-items: center; }
-        .pos-header { padding-left: 15px; justify-content: flex-start; }
-        .driver-header { padding-left: 10px; }
-        .time-header { padding-left: 10px; }
+        .tower-header > div { display: flex; align-items: center; justify-content: flex-start; }
+        .tower-header .center { justify-content: center; }
 
         .driver-container {
             border-bottom: 1px solid #2a2a35;
             cursor: pointer;
             transition: background-color 0.2s;
         }
-
-        .driver-container:hover {
-            background-color: #20202c;
-        }
-
+        .driver-container:hover { background-color: #20202c; }
         .driver-container:last-child { border-bottom: none; }
+        
+        /* Eliminated styling for Quali */
+        .driver-container.eliminated .driver-row { opacity: 0.4; }
 
         .driver-row {
             display: grid;
-            grid-template-columns: 65px 80px 40px 1fr;
             padding: 8px 0;
             align-items: center;
-            font-size: 1.1rem;
+            font-size: 1.05rem;
             font-weight: 700;
         }
 
-        /* The Triangle (Chevron) Styles */
-        .chevron {
-            font-size: 0.65rem;
-            color: #ffffff;
-            margin-right: 6px;
-            transition: transform 0.2s ease-in-out;
-            display: inline-block;
-        }
-
-        /* Rotates the triangle 90 degrees when open */
-        .driver-container.open .chevron {
-            transform: rotate(90deg);
-        }
+        .chevron { font-size: 0.65rem; color: #ffffff; margin-right: 6px; transition: transform 0.2s; display: inline-block; }
+        .driver-container.open .chevron { transform: rotate(90deg); }
 
         .expanded-details {
             display: none; 
             background-color: #111118;
-            padding: 12px 20px;
+            padding: 12px 15px;
             font-size: 0.85rem;
             color: #a0a0b0;
-            justify-content: space-between;
             border-top: 1px dashed #2a2a35;
-        }
-
-        .expanded-details div {
-            display: flex;
             flex-direction: column;
-            align-items: center;
-            gap: 4px;
+            gap: 10px;
         }
-
-        .expanded-details span {
-            color: #ffffff;
-            font-family: 'Roboto Mono', monospace;
-            font-size: 0.95rem;
-        }
-
         .driver-container.open .expanded-details { display: flex; }
-        .driver-container.open { background-color: #15151e; }
 
-        /* Adjusted POS to align left and accommodate the chevron */
-        .pos { display: flex; align-items: center; justify-content: flex-start; padding-left: 12px; color: #ffffff; }
-        .driver { display: flex; align-items: center; border-left: 4px solid; padding-left: 10px; height: 100%; letter-spacing: 1px; }
+        .expanded-row { display: flex; justify-content: space-between; width: 100%; }
+        .expanded-row div { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+        .expanded-row span { color: #ffffff; font-family: 'Roboto Mono', monospace; font-size: 0.95rem; }
         
-        .tyre-col { display: flex; justify-content: center; align-items: center; }
-        .tyre {
-            width: 22px; height: 22px; border-radius: 50%; display: flex;
-            justify-content: center; align-items: center; font-size: 0.8rem;
-            font-weight: bold; border: 2px solid; background: transparent;
-        }
+        /* Sector Highlights */
+        .purple { color: #d600ff !important; font-weight: bold; }
+        .green { color: #00e640 !important; }
+        .yellow { color: #ffe600 !important; }
 
+        .pos { display: flex; align-items: center; padding-left: 8px; color: #ffffff; font-size: 0.95rem;}
+        .driver { display: flex; align-items: center; border-left: 4px solid; padding-left: 8px; height: 100%; letter-spacing: 1px; }
+        
+        .tyre-col { display: flex; align-items: center; gap: 4px; font-size: 0.85rem; color: #d0d0d0;}
+        .tyre {
+            width: 20px; height: 20px; border-radius: 50%; display: flex;
+            justify-content: center; align-items: center; font-size: 0.75rem;
+            font-weight: bold; border: 2px solid; background: transparent; color: white;
+        }
         .tyre.S { border-color: #ff2a2a; color: #ff2a2a; } 
         .tyre.M { border-color: #ffe600; color: #ffe600; } 
         .tyre.H { border-color: #ffffff; color: #ffffff; } 
         .tyre.I { border-color: #00e640; color: #00e640; } 
         .tyre.W { border-color: #00aaff; color: #00aaff; } 
 
-        .time { color: #00e640; font-family: 'Roboto Mono', monospace; text-align: left; padding-left: 10px; font-size: 1rem; }
+        .data-mono { font-family: 'Roboto Mono', monospace; font-size: 0.95rem; }
+        .time-best { color: #00e640; }
+        .gap { color: #ffffff; }
 
         .loading { padding: 30px; text-align: center; color: #a0a0b0; font-weight: 600; }
     </style>
 </head>
 <body>
 
-    <div class="header" id="session-header">
-        Connecting to F1 Data...
-    </div>
-    <div class="session-ended-banner" id="session-ended-banner">
-        LIVE SESSION HAS ENDED
-    </div>
+    <div class="header" id="session-header">Connecting to F1 Data...</div>
+    <div class="session-ended-banner" id="session-ended-banner">LIVE SESSION HAS ENDED</div>
 
     <div class="timing-tower">
-        <div class="tower-header">
-            <div class="pos-header">POS</div>
-            <div class="driver-header">DRIVER</div>
-            <div></div> 
-            <div class="time-header">LAP TIME</div>
-        </div>
+        <div id="tower-header-container"></div>
         <div id="leaderboard">
             <div class="loading">Bootstrapping Telemetry...</div>
         </div>
@@ -182,40 +153,77 @@
 
     <script>
         const BACKEND_URL = "https://brown-gp.onrender.com";
+        const driverLapHistory = {}; // Stores last 5 laps for Practice mode
 
         async function fetchLiveTiming() {
             try {
-                const [sessionRes, timingRes, driverRes] = await Promise.all([
+                // Fetch all 4 data endpoints
+                const [sessionRes, timingRes, driverRes, appRes] = await Promise.all([
                     fetch(`${BACKEND_URL}/api/session`),
                     fetch(`${BACKEND_URL}/api/timing`),
-                    fetch(`${BACKEND_URL}/api/drivers`)
+                    fetch(`${BACKEND_URL}/api/drivers`),
+                    fetch(`${BACKEND_URL}/api/timingapp`)
                 ]);
 
                 const sessionData = await sessionRes.json();
                 const timingData = await timingRes.json();
                 const driverData = await driverRes.json();
+                const appData = await appRes.json();
 
+                // 1. Determine Session Mode
+                const sType = (sessionData.Type || "Race").toLowerCase();
+                let mode = "RACE";
+                if (sType.includes("practice")) mode = "PRACTICE";
+                if (sType.includes("qualifying") || sType.includes("shootout")) mode = "QUALI";
+
+                // 2. Build Header
                 if (sessionData && !sessionData.error) {
                     const meetingName = sessionData.Meeting?.Name || "Formula 1";
-                    const sessionName = sessionData.Name || "Live Session";
-                    const headerEl = document.getElementById('session-header');
-                    const bannerEl = document.getElementById('session-ended-banner');
+                    let sessionName = sessionData.Name || "Live Session";
                     
-                    // Bulletproof session end detection
+                    // Add Q1/Q2/Q3 to header if in Quali
+                    if (mode === "QUALI" && timingData.SessionPart) {
+                        sessionName += ` - Q${timingData.SessionPart}`;
+                    }
+
                     const status = (sessionData.SessionStatus || "").toLowerCase();
                     const archiveStatus = (sessionData.ArchiveStatus?.Status || "").toLowerCase();
-                    
                     const isSessionEnded = ["inactive", "finished", "aborted", "finalised"].includes(status) || ["generating", "complete"].includes(archiveStatus);
+                    
+                    const bannerEl = document.getElementById('session-ended-banner');
+                    const headerEl = document.getElementById('session-header');
                     
                     if (isSessionEnded) {
                         bannerEl.style.display = "block";
                         headerEl.style.borderTopColor = "#a0a0b0"; 
-                        headerEl.innerText = `${meetingName} | ${sessionName}`;
                     } else {
                         bannerEl.style.display = "none";
                         headerEl.style.borderTopColor = "#e10600";
-                        headerEl.innerText = `${meetingName} | ${sessionName}`;
                     }
+                    headerEl.innerText = `${meetingName} | ${sessionName}`;
+                }
+
+                // 3. Build Grid Headers based on Mode
+                const headerContainer = document.getElementById('tower-header-container');
+                if (mode === "RACE") {
+                    headerContainer.innerHTML = `
+                        <div class="tower-header grid-race">
+                            <div class="pos-header">POS</div>
+                            <div>DRIVER</div>
+                            <div>TYRE</div>
+                            <div>INT</div>
+                            <div>GAP</div>
+                            <div class="center">STOPS</div>
+                        </div>`;
+                } else {
+                    headerContainer.innerHTML = `
+                        <div class="tower-header grid-quali">
+                            <div class="pos-header">POS</div>
+                            <div>DRIVER</div>
+                            <div>TYRE</div>
+                            <div>GAP</div>
+                            <div>LAP TIME</div>
+                        </div>`;
                 }
 
                 const leaderboard = document.getElementById('leaderboard');
@@ -225,15 +233,48 @@
                 if (timingData && timingData.Lines) {
                     let activeDrivers = [];
                     const driverProfiles = driverData.Lines || driverData || {};
+                    const appLines = appData.Lines || {};
 
                     for (const [driverNum, driverInfo] of Object.entries(timingData.Lines)) {
                         if (!driverInfo.Position || isNaN(driverInfo.Position)) continue;
+                        const pos = parseInt(driverInfo.Position);
 
-                        let bestLap = 'NO TIME';
-                        if (driverInfo.BestLapTime && driverInfo.BestLapTime.Value) {
-                            bestLap = driverInfo.BestLapTime.Value;
+                        // Laps & Tyres (From TimingAppData)
+                        const stints = appLines[driverNum]?.Stints || [];
+                        let tyreAge = 0;
+                        let currentTyre = 'S';
+                        let pitStops = Math.max(0, stints.length - 1);
+
+                        if (stints.length > 0) {
+                            const lastStint = stints[stints.length - 1];
+                            const compound = lastStint.Compound ? lastStint.Compound.toUpperCase() : '';
+                            if(compound === 'SOFT') currentTyre = 'S';
+                            if(compound === 'MEDIUM') currentTyre = 'M';
+                            if(compound === 'HARD') currentTyre = 'H';
+                            if(compound === 'INTERMEDIATE') currentTyre = 'I';
+                            if(compound === 'WET') currentTyre = 'W';
+                            
+                            // Calculate Laps on current tyre
+                            tyreAge = lastStint.NewLaps || lastStint.TotalLaps || 0;
                         }
 
+                        // Gaps & Intervals
+                        const gap = driverInfo.GapToLeader || '';
+                        const interval = driverInfo.IntervalToPositionAhead?.Value || '';
+                        const bestLap = driverInfo.BestLapTime?.Value || 'NO TIME';
+                        
+                        // Practice Mode History Logging
+                        const lastLap = driverInfo.LastLapTime?.Value;
+                        if (mode === "PRACTICE") {
+                            if (!driverLapHistory[driverNum]) driverLapHistory[driverNum] = [];
+                            // Only add if it's a new lap time
+                            if (lastLap && driverLapHistory[driverNum][0] !== lastLap) {
+                                driverLapHistory[driverNum].unshift(lastLap);
+                                if (driverLapHistory[driverNum].length > 5) driverLapHistory[driverNum].pop();
+                            }
+                        }
+
+                        // Quali Q1/Q2/Q3
                         let q1 = '--', q2 = '--', q3 = '--';
                         if (driverInfo.BestLapTimes && Array.isArray(driverInfo.BestLapTimes)) {
                             if (driverInfo.BestLapTimes.length > 0) q1 = driverInfo.BestLapTimes[0].Value || '--';
@@ -241,28 +282,35 @@
                             if (driverInfo.BestLapTimes.length > 2) q3 = driverInfo.BestLapTimes[2].Value || '--';
                         }
 
-                        let currentTyre = 'S'; 
-                        if (driverInfo.Stints && driverInfo.Stints.length > 0) {
-                            const lastStint = driverInfo.Stints[driverInfo.Stints.length - 1];
-                            const compound = lastStint.Compound ? lastStint.Compound.toUpperCase() : '';
-                            if(compound === 'SOFT') currentTyre = 'S';
-                            if(compound === 'MEDIUM') currentTyre = 'M';
-                            if(compound === 'HARD') currentTyre = 'H';
-                            if(compound === 'INTERMEDIATE') currentTyre = 'I';
-                            if(compound === 'WET') currentTyre = 'W';
-                        }
+                        // Sectors Parsing
+                        const sData = driverInfo.Sectors || [];
+                        const sectors = [0,1,2].map(i => {
+                            if (!sData[i]) return { val: '--', class: '' };
+                            let cls = '';
+                            if (sData[i].OverallFastest) cls = 'purple';
+                            else if (sData[i].PersonalFastest) cls = 'green';
+                            else cls = 'yellow';
+                            return { val: sData[i].Value || '--', class: cls };
+                        });
 
                         const profile = driverProfiles[driverNum] || {};
 
+                        // Check Eliminations (Quali Mode)
+                        let isEliminated = false;
+                        if (mode === "QUALI" && timingData.SessionPart) {
+                            const part = parseInt(timingData.SessionPart);
+                            if (part === 1 && pos > 15) isEliminated = true;
+                            if (part === 2 && pos > 10) isEliminated = true;
+                        }
+
                         activeDrivers.push({
-                            pos: parseInt(driverInfo.Position),
-                            name: profile.Tla || "UNK",
+                            num: driverNum, pos: pos, name: profile.Tla || "UNK",
                             color: '#' + (profile.TeamColour || 'a0a0b0').replace('##', '#'),
-                            time: bestLap,
-                            tyre: currentTyre,
-                            q1: q1,
-                            q2: q2,
-                            q3: q3
+                            best: bestLap, gap: gap, int: interval,
+                            tyre: currentTyre, age: tyreAge, stops: pitStops,
+                            q1: q1, q2: q2, q3: q3,
+                            s1: sectors[0], s2: sectors[1], s3: sectors[2],
+                            eliminated: isEliminated
                         });
                     }
 
@@ -270,42 +318,80 @@
                         leaderboard.innerHTML = ''; 
                         activeDrivers.sort((a, b) => a.pos - b.pos).forEach(d => {
                             const container = document.createElement('div');
-                            container.className = 'driver-container';
+                            container.className = `driver-container ${d.eliminated ? 'eliminated' : ''}`;
                             container.dataset.driver = d.name; 
-                            
-                            if (openNames.includes(d.name)) {
-                                container.classList.add('open');
+                            if (openNames.includes(d.name)) container.classList.add('open');
+
+                            container.onclick = function() { this.classList.toggle('open'); };
+
+                            // Render specific layout based on mode
+                            let mainRow = '';
+                            let expandedRow = '';
+
+                            if (mode === "RACE") {
+                                // RACE MAIN ROW
+                                mainRow = `
+                                    <div class="driver-row grid-race">
+                                        <div class="pos">${d.pos}</div>
+                                        <div class="driver" style="border-color: ${d.color};">${d.name}</div>
+                                        <div class="tyre-col">${d.age} <div class="tyre ${d.tyre}">${d.tyre}</div></div>
+                                        <div class="data-mono">${d.int}</div>
+                                        <div class="data-mono gap">${d.gap}</div>
+                                        <div class="data-mono" style="text-align:center;">${d.stops}</div>
+                                    </div>`;
+                                expandedRow = `<div class="expanded-row"><div>Race view active.</div></div>`;
+                            } 
+                            else {
+                                // PRACTICE & QUALI MAIN ROW
+                                mainRow = `
+                                    <div class="driver-row grid-quali">
+                                        <div class="pos"><span class="chevron">▶</span> ${d.pos}</div>
+                                        <div class="driver" style="border-color: ${d.color};">${d.name}</div>
+                                        <div class="tyre-col">${d.age} <div class="tyre ${d.tyre}">${d.tyre}</div></div>
+                                        <div class="data-mono gap">${d.gap}</div>
+                                        <div class="data-mono time-best">${d.best}</div>
+                                    </div>`;
+                                
+                                // Expandable Sector UI
+                                const sectorsUI = `
+                                    <div class="expanded-row">
+                                        <div>S1 <span class="${d.s1.class}">${d.s1.val}</span></div>
+                                        <div>S2 <span class="${d.s2.class}">${d.s2.val}</span></div>
+                                        <div>S3 <span class="${d.s3.class}">${d.s3.val}</span></div>
+                                    </div>`;
+
+                                if (mode === "QUALI") {
+                                    expandedRow = `
+                                        ${sectorsUI}
+                                        <div class="expanded-row" style="margin-top: 5px;">
+                                            <div>Q1 <span>${d.q1}</span></div>
+                                            <div>Q2 <span>${d.q2}</span></div>
+                                            <div>Q3 <span>${d.q3}</span></div>
+                                        </div>`;
+                                } else if (mode === "PRACTICE") {
+                                    const h = driverLapHistory[d.num] || [];
+                                    const historyHTML = h.length > 0 
+                                        ? h.map(lap => `<span>${lap}</span>`).join('') 
+                                        : `<span>Waiting for laps...</span>`;
+                                    
+                                    expandedRow = `
+                                        ${sectorsUI}
+                                        <div style="margin-top: 5px; text-align:center; color:#fff;">
+                                            <span style="color:#a0a0b0; font-size:0.75rem; display:block;">PAST 5 LAPS (LIVE)</span>
+                                            <div style="display:flex; justify-content:space-between; width:100%; padding-top:4px;">
+                                                ${historyHTML}
+                                            </div>
+                                        </div>`;
+                                }
                             }
 
-                            container.onclick = function() {
-                                this.classList.toggle('open');
-                            };
-
-                            container.innerHTML = `
-                                <div class="driver-row">
-                                    <div class="pos"><span class="chevron">▶</span> ${d.pos}</div>
-                                    <div class="driver" style="border-color: ${d.color};">${d.name}</div>
-                                    <div class="tyre-col">
-                                        <div class="tyre ${d.tyre}">${d.tyre}</div>
-                                    </div>
-                                    <div class="time">${d.time}</div>
-                                </div>
-                                <div class="expanded-details">
-                                    <div>Q1 <span>${d.q1}</span></div>
-                                    <div>Q2 <span>${d.q2}</span></div>
-                                    <div>Q3 <span>${d.q3}</span></div>
-                                </div>
-                            `;
+                            container.innerHTML = mainRow + `<div class="expanded-details">${expandedRow}</div>`;
                             leaderboard.appendChild(container);
                         });
                     }
                 }
             } catch (error) {
                 console.error("Error pulling F1 stream data:", error);
-                if (document.getElementById('leaderboard').innerHTML.includes("Bootstrapping")) {
-                    document.getElementById('leaderboard').innerHTML = 
-                        `<div class="loading" style="color:#a0a0b0;">Waiting for next session data...</div>`;
-                }
             }
         }
 
