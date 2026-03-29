@@ -58,18 +58,30 @@
         const BACKEND_URL = "https://brown-gp.onrender.com";
         const driverLapHistory = {}; 
         
-        // 🚨 2026 FULL FALLBACK ROSTER 🚨
+        // 🚨 2026 OFFICIAL GRID FALLBACK (CORRECT NUMBERS & NEW TEAM COLORS) 🚨
         const FALLBACK_DRIVERS = {
-            "1": { Tla: "VER", TeamColour: "3671C6" }, "11": { Tla: "PER", TeamColour: "3671C6" },
-            "16": { Tla: "LEC", TeamColour: "E8002D" }, "44": { Tla: "HAM", TeamColour: "E8002D" },
-            "4": { Tla: "NOR", TeamColour: "FF8000" }, "81": { Tla: "PIA", TeamColour: "FF8000" },
-            "63": { Tla: "RUS", TeamColour: "27F4D2" }, "12": { Tla: "ANT", TeamColour: "27F4D2" },
-            "14": { Tla: "ALO", TeamColour: "229971" }, "18": { Tla: "STR", TeamColour: "229971" },
-            "10": { Tla: "GAS", TeamColour: "0093CC" }, "7": { Tla: "DOO", TeamColour: "0093CC" }, "61": { Tla: "DOO", TeamColour: "0093CC" },
-            "23": { Tla: "ALB", TeamColour: "64C4FF" }, "55": { Tla: "SAI", TeamColour: "64C4FF" }, "43": { Tla: "COL", TeamColour: "64C4FF" },
-            "22": { Tla: "TSU", TeamColour: "6692FF" }, "30": { Tla: "LAW", TeamColour: "6692FF" }, "82": { Tla: "HAD", TeamColour: "6692FF" },
-            "27": { Tla: "HUL", TeamColour: "52E252" }, "5": { Tla: "BOR", TeamColour: "52E252" }, "8": { Tla: "BOR", TeamColour: "52E252" },
-            "31": { Tla: "OCO", TeamColour: "B6BABD" }, "87": { Tla: "BEA", TeamColour: "B6BABD" }, "38": { Tla: "BEA", TeamColour: "B6BABD" }
+            "1": { Tla: "NOR", TeamColour: "FF8000" }, // McLaren (Reigning Champ)
+            "3": { Tla: "VER", TeamColour: "3671C6" }, // Red Bull (Switched to #3)
+            "5": { Tla: "BOR", TeamColour: "E50000" }, // Audi
+            "6": { Tla: "HAD", TeamColour: "3671C6" }, // Red Bull
+            "10": { Tla: "GAS", TeamColour: "0093CC" }, // Alpine
+            "11": { Tla: "PER", TeamColour: "FFB800" }, // Cadillac
+            "12": { Tla: "ANT", TeamColour: "27F4D2" }, // Mercedes
+            "14": { Tla: "ALO", TeamColour: "229971" }, // Aston Martin
+            "16": { Tla: "LEC", TeamColour: "E8002D" }, // Ferrari
+            "18": { Tla: "STR", TeamColour: "229971" }, // Aston Martin
+            "23": { Tla: "ALB", TeamColour: "64C4FF" }, // Williams
+            "27": { Tla: "HUL", TeamColour: "E50000" }, // Audi
+            "30": { Tla: "LAW", TeamColour: "6692FF" }, // Racing Bulls
+            "31": { Tla: "OCO", TeamColour: "B6BABD" }, // Haas
+            "41": { Tla: "LIN", TeamColour: "6692FF" }, // Racing Bulls
+            "43": { Tla: "COL", TeamColour: "0093CC" }, // Alpine
+            "44": { Tla: "HAM", TeamColour: "E8002D" }, // Ferrari
+            "55": { Tla: "SAI", TeamColour: "64C4FF" }, // Williams
+            "63": { Tla: "RUS", TeamColour: "27F4D2" }, // Mercedes
+            "77": { Tla: "BOT", TeamColour: "FFB800" }, // Cadillac
+            "81": { Tla: "PIA", TeamColour: "FF8000" }, // McLaren
+            "87": { Tla: "BEA", TeamColour: "B6BABD" }  // Haas
         };
         
         let seenMessages = new Set();
@@ -241,11 +253,10 @@
                             return { val: sData[i].Value || '--', class: cls };
                         });
 
-                        // 🚨 BULLETPROOF FALLBACK MERGE 🚨
+                        // 🚨 BULLETPROOF FALLBACK MERGE (WITH NEW 2026 GRID) 🚨
                         const apiProfile = driverProfiles[driverNum] || {};
                         const fallbackProfile = FALLBACK_DRIVERS[driverNum] || {};
                         
-                        // If F1 gives us an object but it's missing the Tla, default to the fallback immediately
                         const finalTla = apiProfile.Tla || fallbackProfile.Tla || "UNK";
                         const finalColor = '#' + (apiProfile.TeamColour || fallbackProfile.TeamColour || 'a0a0b0').replace('##', '#');
 
