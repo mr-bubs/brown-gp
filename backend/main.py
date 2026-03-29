@@ -28,6 +28,7 @@ if not os.path.exists('f1cache'):
     os.makedirs('f1cache')
 fastf1.Cache.enable_cache('f1cache')
 
+# The permanent disk cache file for Driver Names
 DRIVER_BACKUP_FILE = "f1cache/driver_backup.json"
 
 HEADERS = {
@@ -147,7 +148,6 @@ async def f1_signalr_client():
                     
                     # 🚨 THE PERMANENT FIX: Self-Healing Memory Bank 🚨
                     if endpoint == "DriverList":
-                        # Check if F1 gave us actual data or just a blank glitch
                         lines = data.get("Lines", data) if isinstance(data, dict) else {}
                         if lines: 
                             LIVE_DATA["DriverList"] = data
@@ -159,13 +159,14 @@ async def f1_signalr_client():
                                 print("F1 DriverList is blank! Rescuing names from local disk cache...")
                                 with open(DRIVER_BACKUP_FILE, "r") as f:
                                     LIVE_DATA["DriverList"] = json.load(f)
+                            else:
+                                LIVE_DATA["DriverList"] = data
                     else:
                         LIVE_DATA[endpoint] = data
         print("Bootstrap complete!")
     except Exception as e:
         print(f"Bootstrap skipped/failed: {e}")
-        # Emergency fallback if the entire F1 API request crashed
-        if os.path.exists(DRIVER_BACKUP_FILE) and not LIVE_DATA["DriverList"]:
+        if os.path.exists(DRIVER_BACKUP_FILE) and not LIVE_DATA.get("DriverList"):
             print("API offline. Loading DriverList from disk cache...")
             with open(DRIVER_BACKUP_FILE, "r") as f:
                 LIVE_DATA["DriverList"] = json.load(f)
@@ -213,7 +214,6 @@ async def f1_signalr_client():
                                     if 'Messages' in payload:
                                         LIVE_DATA[category]['Messages'].extend(payload['Messages'])
                                 elif category == 'DriverList':
-                                    # If F1 updates the DriverList mid-session, save it to disk!
                                     update_dict(LIVE_DATA.setdefault(category, {}), payload)
                                     with open(DRIVER_BACKUP_FILE, "w") as f:
                                         json.dump(LIVE_DATA["DriverList"], f)
@@ -228,8 +228,170 @@ async def f1_signalr_client():
 
 # --- TASK 2: DASHBOARD BROADCASTER ---
 async def data_engine():
-    # Keep the rest exactly the same as your current file, we don't need to change data_engine
-    pass
+    track_x, track_y, track_dist, m_sectors, total_laps = [], [], [], [], None
+    live_circuit = ""
+    send_track = False
+    last_rcm_count = 0
+    active_yellow_sectors = set()
+    active_toast = ""
 
-# Note: Since I didn't print data_engine to save space, make sure you don't delete your existing data_engine function!
-# Just replace everything ABOVE data_engine with the code block above.
+    while True:
+        try:
+            info = LIVE_DATA.get('SessionInfo', {})
+            drivers_dict = LIVE_DATA.get('DriverList', {})
+            timing_data = LIVE_DATA.get('TimingData', {}).get('Lines', {})
+            app_data = LIVE_DATA.get('TimingAppData', {}).get('Lines', {})
+            messages = LIVE_DATA.get('RaceControlMessages', {}).get('Messages', [])
+
+            raw_pos = LIVE_DATA.get('Position', {}).get('Position', [])
+            latest_update = raw_pos[-1] if isinstance(raw_pos, list) and len(raw_pos) > 0 else raw_pos
+            cars_pos = latest_update.get('Entries', {}) if isinstance(latest_update, dict) else {}
+
+            session_title, lap_display_str = "📍 Waiting...", "Lap ?"
+            session_status = "Waiting"
+
+            if info and isinstance(info, dict):
+                new_circuit = info.get('Meeting', {}).get('Name', 'Bahrain')
+                live_session = info.get('Name', 'Race')
+                live_year = int(info.get('StartDate', '2024')[:4])
+
+                if new_circuit and new_circuit != live_circuit:
+                    live_circuit = new_circuit
+                    track_x, track_y, track_dist, m_sectors, total_laps = await asyncio.to_thread(get_track_background_sync, live_year, live_circuit, live_session)
+                    send_track = True
+
+                session_title = f"{live_circuit} | {live_session}" if live_year == 2026 else f"{live_circuit}, {live_year} | {live_session}"
+                
+                session_status = info.get('SessionStatus', 'Waiting')
+                if session_status == 'Inactive':
+                    lap_display_str = "Session Ended"
+
+            if isinstance(messages, list) and len(messages) > last_rcm_count:
+                new_msgs = messages[last_rcm_count:]
+                last_rcm_count = len(messages)
+
+                for msg in new_msgs:
+                    text = str(msg.get('Message', '')).upper()
+                    if 'YELLOW IN TRACK SECTOR' in text or 'YELLOW IN SECTOR' in text:
+                        match = re.search(r'SECTOR[S]? ([0-9]+(?: AND [0-9]+)?)', text)
+                        if match:
+                            nums = re.findall(r'\d+', match.group(1))
+                            for n in nums: active_yellow_sectors.add(int(n))
+                    if 'CLEAR' in text:
+                        match = re.search(r'SECTOR[S]? ([0-9]+(?: AND [0-9]+)?)', text)
+                        if match:
+                            nums = re.findall(r'\d+', match.group(1))
+                            for n in nums:
+                                if int(n) in active_yellow_sectors: active_yellow_sectors.remove(int(n))
+                        elif 'SECTOR' not in text:
+                            active_yellow_sectors.clear()
+
+                    toast_keywords = ['YELLOW', 'RED', 'BLACK AND WHITE', 'PENALTY', 'VIRTUAL SAFETY CAR', 'SAFETY CAR']
+                    if any(kw in text for kw in toast_keywords):
+                        active_toast = msg.get('Message', '')
+
+            tower_payload, map_drivers_payload, current_lap = [], [], 0
+
+            if isinstance(drivers_dict, dict) and drivers_dict:
+                d_lines = drivers_dict if '1' in drivers_dict else drivers_dict.get('Lines', {})
+
+                for car_num, driver_info in d_lines.items():
+                    if not isinstance(driver_info, dict) or 'Tla' not in driver_info: continue
+
+                    car_str = str(car_num)
+                    drv_name = driver_info.get('Tla', 'UNK')
+                    clean_color = f"#{driver_info.get('TeamColour', 'A9A9A9')}".replace('##', '#')
+
+                    car_timing = timing_data.get(car_str, {}) if isinstance(timing_data, dict) else {}
+                    if car_timing.get('Retired') or car_timing.get('Stopped'): continue
+
+                    driver_lap = car_timing.get('NumberOfLaps', 0)
+                    if driver_lap and str(driver_lap).isdigit(): current_lap = max(current_lap, int(driver_lap))
+
+                    pos = int(car_timing.get('Position', 99))
+                    raw_gap = car_timing.get('GapToLeader', '')
+                    raw_interval = car_timing.get('IntervalToPositionAhead', {}).get('Value', '')
+
+                    gap_seconds = 0.0 if pos == 1 else parse_gap(raw_gap)
+                    interval_str = "Leader" if pos == 1 else f"+{str(raw_interval).replace('+', '').strip() if raw_interval else str(raw_gap).replace('+', '').strip()}"
+                    gap_str = '' if pos == 1 else f"+{str(raw_gap).replace('+', '').strip()}"
+
+                    tyre_color, tyre_age, pit_stops = '#ffffff', 0, 0
+                    try:
+                        stints = app_data.get(car_str, {}).get('Stints', [])
+                        if stints and isinstance(stints, list):
+                            pit_stops = max(0, len(stints) - 1)
+                            c = str(stints[-1].get('Compound', '')).upper()
+                            if c == 'SOFT': tyre_color = '#FF0000'
+                            elif c == 'MEDIUM': tyre_color = '#FFFF00'
+                            elif c == 'HARD': tyre_color = '#FFFFFF'
+                            elif c == 'INTERMEDIATE': tyre_color = '#00FF00'
+                            elif c == 'WET': tyre_color = '#00BFFF'
+                            raw_age = stints[-1].get('TotalLaps', stints[-1].get('Laps', 0))
+                            tyre_age = int(raw_age) if str(raw_age).isdigit() else 0
+                    except: pass
+
+                    if pos != 99 and (pos == 1 or gap_seconds > 0.0):
+                        tower_payload.append({
+                            "car": car_str, "name": drv_name, "color": clean_color, "pos": pos,
+                            "gap_secs": gap_seconds, "interval": interval_str, "gap": gap_str,
+                            "t_color": tyre_color, "t_age": tyre_age, "stops": pit_stops
+                        })
+
+                    car_map_data = cars_pos.get(car_str, {}) if isinstance(cars_pos, dict) else {}
+                    if 'X' in car_map_data and 'Y' in car_map_data:
+                        map_drivers_payload.append({
+                            "car_num": car_str, "name": drv_name, "x": car_map_data['X'], "y": car_map_data['Y'],
+                            "color": clean_color, "t_color": tyre_color, "pos": str(pos) if pos != 99 else ""
+                        })
+
+            tower_payload.sort(key=lambda x: x['pos'])
+            running_max = 0.0
+            for d in tower_payload:
+                if d['pos'] == 1: d['gap_secs'] = 0.0
+                else:
+                    if d['gap_secs'] <= running_max: d['gap_secs'] = running_max + 1.0
+                running_max = d['gap_secs']
+
+            if session_status != 'Inactive':
+                lap_display_str = f"Lap {current_lap}/{total_laps}" if total_laps else f"Lap {current_lap}"
+
+            rcm_payload = []
+            if isinstance(messages, list):
+                for msg in reversed(messages[-20:]): 
+                    rcm_text = msg.get('Message', '...')
+                    raw_time = msg.get('Utc', '')
+                    time_str = raw_time.split('T')[1][:8] if 'T' in raw_time else ''
+                    rcm_payload.append({"time": time_str, "msg": rcm_text})
+
+            state = {
+                "session": {"title": session_title, "lap": lap_display_str, "status": session_status},
+                "map_drivers": map_drivers_payload,
+                "tower": tower_payload,
+                "rcm": rcm_payload,
+                "yellow_sectors": list(active_yellow_sectors),
+                "active_toast": active_toast
+            }
+
+            if send_track:
+                state["track"] = {"x": track_x, "y": track_y, "dist": track_dist, "m_sectors": m_sectors}
+                send_track = False
+            else: state["track"] = {}
+
+            active_toast = ""
+
+            for client in list(connected_clients):
+                await client.send_text(json.dumps(state))
+
+        except Exception as e:
+            pass 
+
+        await asyncio.sleep(0.1)
+
+@app.on_event("startup")
+async def startup_event():
+    asyncio.create_task(f1_signalr_client())
+    asyncio.create_task(data_engine())
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=10000)
