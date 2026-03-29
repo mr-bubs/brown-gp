@@ -22,7 +22,7 @@
         .driver-container { border-bottom: 1px solid #2a2a35; cursor: pointer; transition: background-color 0.2s; }
         .driver-container:hover { background-color: #20202c; }
         .driver-container:last-child { border-bottom: none; }
-        .driver-container.eliminated .driver-row { opacity: 0.4; }
+        .driver-container.out .driver-row { opacity: 0.4; } /* Grays out retired or eliminated cars */
         .driver-row { display: grid; padding: 8px 0; align-items: center; font-size: 1.05rem; font-weight: 700; }
         .chevron { font-size: 0.65rem; color: #ffffff; margin-right: 6px; transition: transform 0.2s; display: inline-block; }
         .driver-container.open .chevron { transform: rotate(90deg); }
@@ -37,11 +37,8 @@
         .pos { display: flex; align-items: center; padding-left: 8px; color: #ffffff; font-size: 0.95rem;}
         .driver { display: flex; align-items: center; border-left: 4px solid; padding-left: 8px; height: 100%; letter-spacing: 1px; }
         .tyre-col { display: flex; align-items: center; gap: 4px; font-size: 0.85rem; color: #d0d0d0;}
-        
-        /* Added a 'U' class for unknown tyres if F1 drops the compound string */
         .tyre { width: 20px; height: 20px; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 0.75rem; font-weight: bold; border: 2px solid; background: transparent; color: white; }
         .tyre.S { border-color: #ff2a2a; color: #ff2a2a; } .tyre.M { border-color: #ffe600; color: #ffe600; } .tyre.H { border-color: #ffffff; color: #ffffff; } .tyre.I { border-color: #00e640; color: #00e640; } .tyre.W { border-color: #00aaff; color: #00aaff; } .tyre.U { border-color: #555555; color: #a0a0b0; }
-        
         .data-mono { font-family: 'Roboto Mono', monospace; font-size: 0.95rem; }
         .time-best { color: #00e640; }
         .gap { color: #ffffff; }
@@ -61,6 +58,7 @@
         const BACKEND_URL = "https://brown-gp.onrender.com";
         const driverLapHistory = {}; 
         
+        // The Official 2026 Grid
         const FALLBACK_DRIVERS = {
             "1": { Tla: "NOR", TeamColour: "FF8000" }, "3": { Tla: "VER", TeamColour: "3671C6" },
             "5": { Tla: "BOR", TeamColour: "E50000" }, "6": { Tla: "HAD", TeamColour: "3671C6" },
@@ -186,36 +184,31 @@
                 const driverProfiles = driverData.Lines || driverData || {};
                 const appLines = appData.Lines || {};
 
-                // 🚨 GOD MODE: Loop through our fallback list to guarantee every driver is checked, even if F1's feed drops them!
                 for (const driverNum of Object.keys(FALLBACK_DRIVERS)) {
                     const driverInfo = (timingData.Lines || {})[driverNum] || {};
                     
-                    if (driverInfo.Retired || driverInfo.Stopped) continue;
-
+                    // We no longer delete pitting drivers! Let them stay on the board.
                     let pos = parseInt(driverInfo.Position) || 99;
+                    const isRetired = driverInfo.Retired || false;
 
-                    // 🚨 BULLETPROOF STINTS (Fixes the Pitstop math bug)
                     const stintsData = appLines[driverNum]?.Stints;
                     let tyreAge = 0;
-                    let currentTyre = 'U'; // U for Unknown if F1 drops it
+                    let currentTyre = 'U'; 
                     let pitStops = 0;
 
                     if (stintsData) {
-                        const stintKeys = Object.keys(stintsData).filter(k => !isNaN(k)).map(Number);
-                        if (stintKeys.length > 0) {
-                            // The highest Key ID is equal to the Pitstop count!
-                            pitStops = Math.max(...stintKeys);
-                            const lastStint = stintsData[pitStops];
-                            
-                            if (lastStint && lastStint.Compound) {
-                                const compound = lastStint.Compound.toUpperCase();
-                                if(compound.includes('SOFT')) currentTyre = 'S';
-                                else if(compound.includes('MEDIUM')) currentTyre = 'M';
-                                else if(compound.includes('HARD')) currentTyre = 'H';
-                                else if(compound.includes('INTERMEDIATE')) currentTyre = 'I';
-                                else if(compound.includes('WET')) currentTyre = 'W';
-                            }
-                            if (lastStint) tyreAge = lastStint.NewLaps || lastStint.TotalLaps || 0;
+                        const stints = Array.isArray(stintsData) ? stintsData : Object.values(stintsData);
+                        const validStints = stints.filter(s => s && s.Compound);
+                        if (validStints.length > 0) {
+                            pitStops = validStints.length - 1;
+                            const lastStint = validStints[validStints.length - 1];
+                            const compound = (lastStint.Compound || '').toUpperCase();
+                            if(compound.includes('SOFT')) currentTyre = 'S';
+                            else if(compound.includes('MEDIUM')) currentTyre = 'M';
+                            else if(compound.includes('HARD')) currentTyre = 'H';
+                            else if(compound.includes('INTERMEDIATE')) currentTyre = 'I';
+                            else if(compound.includes('WET')) currentTyre = 'W';
+                            tyreAge = lastStint.NewLaps || lastStint.TotalLaps || 0;
                         }
                     }
 
@@ -223,17 +216,6 @@
                     const interval = driverInfo.IntervalToPositionAhead?.Value || '';
                     const bestLap = driverInfo.BestLapTime?.Value || 'NO TIME';
 
-                    // 🚨 MATHEMATICAL POSITION CALCULATION
-                    let gapVal = 9999;
-                    if (gap) {
-                        if (gap.includes('LAP')) gapVal = 1000 + parseInt(gap);
-                        else gapVal = parseFloat(gap.replace('+', '')) || 0;
-                    } else if (pos === 1) {
-                        gapVal = 0;
-                    } else if (pos !== 99) {
-                        gapVal = pos * 100; // Emergency fallback sorting
-                    }
-                    
                     const lastLap = driverInfo.LastLapTime?.Value;
                     if (mode === "PRACTICE") {
                         if (!driverLapHistory[driverNum]) driverLapHistory[driverNum] = [];
@@ -274,34 +256,38 @@
 
                     activeDrivers.push({
                         num: driverNum, pos: pos, name: finalTla, color: finalColor,
-                        best: bestLap, gap: gap, int: interval, gapVal: gapVal,
+                        best: bestLap, gap: gap, int: interval,
                         tyre: currentTyre, age: tyreAge, stops: pitStops,
                         q1: q1, q2: q2, q3: q3, s1: sectors[0], s2: sectors[1], s3: sectors[2],
-                        eliminated: isEliminated
+                        out: isEliminated || isRetired
                     });
                 }
 
                 if (activeDrivers.length > 0) {
-                    // Sort mathematically by Gap to Leader to fix missing F1 positions
-                    activeDrivers.sort((a, b) => a.gapVal - b.gapVal);
-                    
-                    let visualPos = 1;
+                    // 🚨 SORT PURELY BY OFFICIAL F1 POSITION NUMBER! NO MORE NaN BREAKAGES!
+                    activeDrivers.sort((a, b) => a.pos - b.pos);
 
                     leaderboard.innerHTML = ''; 
                     activeDrivers.forEach(d => {
+                        // Hide drivers who genuinely haven't joined the race yet (pos 99)
+                        if (d.pos === 99 && !d.out) return;
+
                         const container = document.createElement('div');
-                        container.className = `driver-container ${d.eliminated ? 'eliminated' : ''}`;
+                        container.className = `driver-container ${d.out ? 'out' : ''}`;
                         container.dataset.driver = d.name; 
                         if (openNames.includes(d.name)) container.classList.add('open');
                         container.onclick = function() { this.classList.toggle('open'); };
 
                         let mainRow = '';
                         let expandedRow = '';
+                        
+                        // Let F1's official position drive the display
+                        const displayPos = d.pos === 99 ? 'OUT' : d.pos;
 
                         if (mode === "RACE") {
                             mainRow = `
                                 <div class="driver-row grid-race">
-                                    <div class="pos">${visualPos++}</div>
+                                    <div class="pos">${displayPos}</div>
                                     <div class="driver" style="border-color: ${d.color};">${d.name}</div>
                                     <div class="tyre-col">${d.age} <div class="tyre ${d.tyre}">${d.tyre === 'U' ? '' : d.tyre}</div></div>
                                     <div class="data-mono">${d.int}</div>
@@ -312,7 +298,7 @@
                         } else {
                             mainRow = `
                                 <div class="driver-row grid-quali">
-                                    <div class="pos"><span class="chevron">▶</span> ${visualPos++}</div>
+                                    <div class="pos"><span class="chevron">▶</span> ${displayPos}</div>
                                     <div class="driver" style="border-color: ${d.color};">${d.name}</div>
                                     <div class="tyre-col">${d.age} <div class="tyre ${d.tyre}">${d.tyre === 'U' ? '' : d.tyre}</div></div>
                                     <div class="data-mono gap">${d.gap}</div>
