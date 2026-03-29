@@ -67,10 +67,15 @@ def get_session():
 def get_timing():
     return LIVE_DATA.get("TimingData", {})
 
-# ADD THIS NEW ROUTE:
+# --- ADD THIS NEW ROUTE ---
+@app.get("/api/timingapp")
+def get_timing_app():
+    return LIVE_DATA.get("TimingAppData", {})
+
 @app.get("/api/drivers")
 def get_drivers():
     return LIVE_DATA.get("DriverList", {})
+
 
 
 def get_track_background_sync(year, circuit, session_name):
