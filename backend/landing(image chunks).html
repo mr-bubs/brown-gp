@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Brown GP</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Titillium+Web:wght@300;400;600;700;900&family=Roboto+Mono:wght@400;500;700&display=swap');
+
+        :root {
+            --red: #e10600;
+            --bg-rgb: 8, 10, 14; 
+            --bg: rgb(var(--bg-rgb));
+            --surface2: #13161f;
+            --surface3: #1a1d28;
+            --border: #1e2230;
+            --border2: #252838;
+            --text: #f0f0f0;
+            --text-dim: #6b7280;
+            --text-mid: #9ca3af;
+            --green: #00d2be;
+            --gold: #c9a84c;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: var(--bg); color: var(--text);
+            font-family: 'Titillium Web', sans-serif;
+            overflow-x: hidden; height: 5000px;
+            transition: background-color 0.5s ease;
+        }
+
+        .top-bar { position: fixed; top: 0; left: 0; right: 0; height: 3px; background: var(--red); z-index: 100; }
+
+        /* ─── CANVAS SCROLL BACKGROUND ─── */
+        #canvas-bg { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 0; }
+        
+        .vignette {
+            position: fixed; inset: 0; z-index: 1; pointer-events: none;
+            background: radial-gradient(ellipse 70% 70% at 50% 50%, transparent 60%, rgba(var(--bg-rgb), 1) 100%);
+        }
+        
+        .overlay {
+            position: fixed; inset: 0; z-index: 2; pointer-events: none;
+            background: linear-gradient(to bottom, transparent 0%, transparent 50%, rgba(var(--bg-rgb), 1) 100%);
+        }
+
+        /* ─── LOADER ─── */
+        #loader {
+            position: fixed; inset: 0; z-index: 5000; background: var(--bg);
+            display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px;
+            transition: opacity 0.6s ease, visibility 0.6s ease;
+        }
+        #loader.hidden { opacity: 0; visibility: hidden; }
+        .loader-logo { font-size: 54px; font-weight: 900; letter-spacing: -1px; line-height: 1; color: var(--red); text-transform: uppercase; }
+        .loader-logo span { color: white; }
+        .loader-pct { font-family: 'Roboto Mono', monospace; font-size: 11px; letter-spacing: 2px; color: var(--text-dim); text-transform: uppercase; animation: pulse 1.5s infinite; }
+
+        /* ─── HAMBURGER & MENUS ─── */
+        .hamburger {
+            position: fixed; top: 20px; right: 24px; z-index: 200; cursor: pointer; padding: 10px;
+            background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; backdrop-filter: blur(4px);
+        }
+        .hamburger div { width: 20px; height: 2px; background: var(--text); margin: 4px 0; transition: 0.3s; }
+        .hamburger:hover { border-color: rgba(255,255,255,0.3); }
+
+        .side-menu {
+            position: fixed; top: 0; right: -280px; width: 280px; height: 100vh;
+            background: var(--surface2); border-left: 1px solid var(--border);
+            transition: right 0.3s ease; z-index: 150; padding: 80px 24px 20px;
+            box-shadow: -10px 0 30px rgba(0,0,0,0.5);
+        }
+        .side-menu.open { right: 0; }
+        .menu-link {
+            display: block; padding: 16px 0; border-bottom: 1px solid var(--border); color: var(--text);
+            text-decoration: none; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; font-size: 14px; transition: color 0.2s;
+        }
+        .menu-link:hover { color: var(--red); }
+        .menu-link span { font-family: 'Roboto Mono', monospace; font-size: 10px; color: var(--text-dim); display: block; margin-top: 4px; }
+
+        /* ─── DATA MODAL ─── */
+        #data-modal {
+            display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+            z-index: 3000; align-items: center; justify-content: center; backdrop-filter: blur(5px);
+        }
+        #data-modal.open { display: flex; }
+        .data-box {
+            background: var(--surface2); border: 1px solid var(--border2); border-top: 3px solid var(--green); border-radius: 4px;
+            width: 95%; max-width: 700px; max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 20px 50px rgba(0,0,0,0.8);
+        }
+        .data-header { padding: 16px 20px 12px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+        .data-title { font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px; text-transform: uppercase; letter-spacing: 1px;}
+        .close-modal { color: var(--text-dim); cursor: pointer; font-size: 24px; border: none; background: none; line-height: 1; }
+        .close-modal:hover { color: var(--text); }
+        .data-body { padding: 20px; overflow-y: auto; flex: 1; }
+        .data-body::-webkit-scrollbar { width: 6px; }
+        .data-body::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+        .system-metrics { display: flex; gap: 15px; margin-bottom: 20px; }
+        .metric-card { flex: 1; background: var(--surface3); border: 1px solid var(--border); padding: 15px; border-radius: 4px; text-align: center; }
+        .metric-val { font-family: 'Roboto Mono', monospace; font-size: 22px; font-weight: 700; color: var(--text); }
+        .metric-lbl { font-size: 10px; letter-spacing: 2px; color: var(--text-dim); text-transform: uppercase; margin-top: 5px; }
+
+        .data-table { width: 100%; border-collapse: collapse; font-family: 'Roboto Mono', monospace; font-size: 11px; text-align: left; }
+        .data-table th { padding: 10px 8px; border-bottom: 1px solid var(--border); color: var(--text-dim); text-transform: uppercase; font-size: 9px; letter-spacing: 1px; }
+        .data-table td { padding: 10px 8px; border-bottom: 1px solid var(--border); color: var(--text-mid); }
+        .data-table tr:hover td { background: rgba(255,255,255,0.02); }
+        .tag-auto { color: var(--green); background: rgba(0,210,190,0.1); padding: 2px 6px; border-radius: 2px; }
+        .tag-user { color: var(--yellow); background: rgba(255,230,0,0.1); padding: 2px 6px; border-radius: 2px; }
+
+        /* ─── FOREGROUND & LAYOUT ─── */
+        #foreground { position: relative; z-index: 3; pointer-events: none; }
+
+        .hero {
+            position: relative; height: 100vh; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; padding: 0 24px;
+        }
+        .header { text-align: center; margin-bottom: 30px; text-shadow: 0px 4px 20px rgba(0,0,0,0.8); }
+        .season-badge {
+            display: inline-flex; align-items: center; gap: 7px; background: rgba(225,6,0,0.15); border: 1px solid rgba(225,6,0,0.4);
+            border-radius: 2px; padding: 4px 12px; font-family: 'Roboto Mono', monospace; font-size: 10px; color: #ff4d4d;
+            letter-spacing: 2px; text-transform: uppercase; margin-bottom: 18px; backdrop-filter: blur(4px);
+        }
+        .badge-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--red); animation: pulse 2s ease-in-out infinite; }
+        @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.35;transform:scale(0.7)} }
+        
+        .logo { font-size: 54px; font-weight: 900; letter-spacing: -1px; line-height: 1; color: var(--red); text-transform: uppercase; margin-bottom: 8px; }
+        .logo span { color: white; }
+        .subtitle { font-family: 'Roboto Mono', monospace; font-size: 12px; letter-spacing: 6px; color: rgba(255,255,255,0.9); text-transform: uppercase; }
+
+        .hero-scroll-hint {
+            position: absolute; bottom: 30px; display: flex; flex-direction: column; align-items: center; gap: 10px;
+        }
+        .hero-scroll-hint span { font-family: 'Roboto Mono', monospace; font-size: 10px; letter-spacing: 3px; text-transform: uppercase; color: rgba(255,255,255,0.6); }
+        .scroll-line { width: 1px; height: 30px; background: linear-gradient(to bottom, var(--red), transparent); animation: scrollPulse 2s ease-in-out infinite; }
+        @keyframes scrollPulse { 0%, 100% { opacity: 0.3; transform: scaleY(1); } 50% { opacity: 1; transform: scaleY(1.3); } }
+
+        /* ─── DYNAMIC SCROLL CONTENT ─── */
+        .content-wrap { margin-top: 50vh; padding: 0 clamp(24px, 6vw, 96px); pointer-events: auto; }
+        
+        .section {
+            display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 48px; padding: 100px 0; border-bottom: 1px solid rgba(255,255,255,0.05); align-items: center;
+        }
+        .section:last-of-type { border-bottom: none; }
+        .section.reverse { direction: rtl; }
+        .section.reverse > * { direction: ltr; }
+
+        .glass-panel {
+            background: rgba(8, 10, 14, 0.7);
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px; padding: 40px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+        }
+
+        .section-label { font-family: 'Roboto Mono', monospace; font-size: 11px; font-weight: 600; letter-spacing: 4px; text-transform: uppercase; color: var(--red); margin-bottom: 16px; }
+        .section-title { font-size: clamp(32px, 4vw, 48px); font-weight: 900; line-height: 1; letter-spacing: -0.5px; color: var(--text); margin-bottom: 24px; text-transform: uppercase; }
+        .section-body { font-size: 15px; line-height: 1.6; color: rgba(255,255,255,0.7); margin-bottom: 16px; }
+
+        .desc-bullets { list-style: none; margin-top: 16px; display: flex; flex-direction: column; gap: 12px; }
+        .desc-bullets li { font-size: 14px; line-height: 1.6; color: rgba(255,255,255,0.7); position: relative; padding-left: 18px; }
+        .desc-bullets li::before { content: '■'; position: absolute; left: 0; top: 1px; color: var(--red); font-size: 9px; }
+        .desc-bullets b { color: var(--text); font-weight: 700; }
+
+        .nav-buttons-container { display: flex; flex-direction: column; gap: 16px; justify-content: center; }
+        .nav-btn {
+            display: flex; align-items: center; justify-content: space-between; padding: 24px;
+            background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.1); border-left: 4px solid var(--red); border-radius: 4px;
+            color: var(--text); text-decoration: none; cursor: pointer; overflow: hidden; position: relative; transition: background 0.2s, transform 0.2s;
+        }
+        .nav-btn:hover { background: rgba(0, 0, 0, 0.8); border-color: rgba(255, 255, 255, 0.2); transform: translateX(5px); }
+        .btn-label { font-size: 18px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 4px; }
+        .btn-desc { font-family: 'Roboto Mono', monospace; font-size: 11px; color: rgba(255,255,255,0.5); letter-spacing: 0.5px; }
+        .btn-arrow { font-size: 20px; color: var(--red); opacity: 0.8; transition: transform 0.2s, opacity 0.2s; }
+        .nav-btn:hover .btn-arrow { transform: translateX(5px); opacity: 1; }
+
+        .footer-bar {
+            margin-top: 80px; padding: 40px 0 60px; border-top: 1px solid rgba(255,255,255,0.05);
+            display: flex; justify-content: space-between; align-items: center; gap: 24px; flex-wrap: wrap;
+        }
+        .footer-copy { font-family: 'Roboto Mono', monospace; font-size: 10px; letter-spacing: 2px; color: rgba(255,255,255,0.4); text-transform: uppercase; }
+
+        @media (max-width: 900px) {
+            .section { grid-template-columns: 1fr; gap: 32px; padding: 60px 0; }
+            .section.reverse { direction: ltr; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="loader">
+        <div class="loader-logo">Brown<span>GP</span></div>
+        <div class="loader-pct">Initiating Telemetry...</div>
+    </div>
+
+    <canvas id="canvas-bg"></canvas>
+    
+    <div class="vignette"></div>
+    <div class="overlay"></div>
+
+    <div class="top-bar"></div>
+
+    <div class="hamburger" onclick="toggleMenu()">
+        <div></div><div></div><div></div>
+    </div>
+    
+    <div id="side-menu" class="side-menu">
+        <a href="#" class="menu-link" onclick="openDataModal()">
+            Compute Data
+            <span>Server Cache & Thermal Metrics</span>
+        </a>
+        <a href="/session-timing" class="menu-link">Session Timing</a>
+        <a href="/replay" class="menu-link">Replay Dashboard</a>
+    </div>
+
+    <div id="data-modal" onclick="closeDataIfOutside(event)">
+        <div class="data-box">
+            <div class="data-header">
+                <div class="data-title"><span style="color:var(--green);">⚡</span> Engineering Console</div>
+                <button class="close-modal" onclick="closeDataModal()">×</button>
+            </div>
+            <div class="data-body">
+                <div class="system-metrics">
+                    <div class="metric-card"><div class="metric-val" id="total-storage">-- MB</div><div class="metric-lbl">Total Storage Used</div></div>
+                    <div class="metric-card"><div class="metric-val" id="avg-compute">-- s</div><div class="metric-lbl">Avg Compute Pacing</div></div>
+                </div>
+                <table class="data-table">
+                    <thead><tr><th>Race</th><th>Trigger Source</th><th>Completed At</th><th>Duration</th><th>Size</th></tr></thead>
+                    <tbody id="data-tbody"><tr><td colspan="5" style="text-align:center;">Fetching server cache...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="foreground">
+        
+        <section class="hero" id="hero-block">
+            <div class="header">
+                <div class="season-badge"><div class="badge-dot"></div>2026 Season</div>
+                <div class="logo">Brown<span>GP</span></div>
+                <div class="subtitle">F1 Telemetry & Replay</div>
+            </div>
+            
+            <div class="hero-scroll-hint">
+                <span>Scroll to Explore</span>
+                <div class="scroll-line"></div>
+            </div>
+        </section>
+
+        <div class="content-wrap">
+            
+            <div class="section">
+                <div class="glass-panel">
+                    <p class="section-label">Real-Time Analytics</p>
+                    <h2 class="section-title">SESSION<br>TIMING</h2>
+                    <p class="section-body">The Session Timing dashboard dynamically locks onto the current live session, adapting its data feed in real-time. If no cars are on track, it automatically displays the results of the last active session, or provides a complete recap of the previous race weekend.</p>
+                    <p class="section-body">The data feed adapts automatically to the session type:</p>
+                    <ul class="desc-bullets">
+                        <li><b>Races:</b> Track gaps to the leader, pitstop counts, and positions gained or lost. Tap any driver's card to expand and view their complete tyre strategy and stint history.</li>
+                        <li><b>Qualifying:</b> Monitor elimination drop zones and live lap times across Q1, Q2, and Q3 to see the ultimate gaps to pole position.</li>
+                        <li><b>Free Practice:</b> Focus on raw pace by tracking each driver's absolute best lap time and their gap to the fastest car on track.</li>
+                    </ul>
+                </div>
+                <div class="nav-buttons-container">
+                    <a class="nav-btn" href="/session-timing">
+                        <div><div class="btn-label">Session Timing</div><div class="btn-desc">Live timing tower & recaps</div></div>
+                        <div class="btn-arrow">→</div>
+                    </a>
+                    <a class="nav-btn" href="/live">
+                        <div><div class="btn-label">Live Dashboard</div><div class="btn-desc">Real-time race telemetry feed</div></div>
+                        <div class="btn-arrow">→</div>
+                    </a>
+                </div>
+            </div>
+
+            <div class="section reverse">
+                <div class="glass-panel">
+                    <p class="section-label">Historic Analysis</p>
+                    <h2 class="section-title">REPLAY<br>DASHBOARD</h2>
+                    <p class="section-body">The Replay Dashboard acts as your personal F1 time machine. Select any Grand Prix from recent history, and the backend engine will instantly reconstruct the entire race from start to finish using millions of raw telemetry data points.</p>
+                    <p class="section-body">Take full control of the broadcast with a suite of interactive analysis tools:</p>
+                    <ul class="desc-bullets">
+                        <li><b>3D Track Engine:</b> Experience the circuit like never before. The map renders in a fully interactive 3D isometric view, accurately visualizing real-world elevation changes, steep hills, and bridge overlaps.</li>
+                        <li><b>Interactive Camera:</b> Use the virtual joystick to smoothly rotate and zoom the map, or tap and drag the canvas to focus your camera on specific corners as the cars battle.</li>
+                        <li><b>Dynamic Playback:</b> Watch the race unfold at your own pace. Play, pause, scrub through the timeline, or fast-forward the action at up to 10x speed.</li>
+                        <li><b>Live Gap Tower:</b> Track the entire grid in real-time. The dynamic tower automatically updates driver positions, exact gaps to the leader, and current tyre compounds as the race progresses.</li>
+                        <li><b>Race Control Feed:</b> A dedicated message board displays historic yellow flags, safety car deployments, and driver retirements at the exact second they happened.</li>
+                    </ul>
+                </div>
+                <div class="nav-buttons-container">
+                    <a class="nav-btn" href="/replay">
+                        <div><div class="btn-label">Replay Dashboard</div><div class="btn-desc">Enter the 3D track engine</div></div>
+                        <div class="btn-arrow">→</div>
+                    </a>
+                </div>
+            </div>
+
+            <div class="footer-bar">
+                <div class="logo" style="font-size:32px; margin:0; text-shadow:none;">Brown<span>GP</span></div>
+                <div class="footer-copy">© 2026 Brown GP Formula One Team Ltd. All rights reserved.</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ─── UI & MENUS ───
+        function toggleMenu() { document.getElementById('side-menu').classList.toggle('open'); }
+
+        async function openDataModal() {
+            toggleMenu(); 
+            document.getElementById('data-modal').classList.add('open');
+            try {
+                const res = await fetch('/api/cache-status');
+                const data = await res.json();
+                const tbody = document.getElementById('data-tbody');
+                tbody.innerHTML = '';
+                
+                let totalMB = 0; let computeDurations = [];
+
+                for (const [year, races] of Object.entries(data)) {
+                    races.forEach(r => {
+                        if (r.status === 'cached') {
+                            totalMB += r.size_mb;
+                            if (r.duration > 0) computeDurations.push(r.duration);
+                            const isAuto = r.trigger.includes('Auto');
+                            const tagClass = isAuto ? 'tag-auto' : 'tag-user';
+                            const tr = document.createElement('tr');
+                            tr.innerHTML = `
+                                <td style="color:var(--text);">${year} ${r.circuit}</td>
+                                <td><span class="${tagClass}">${r.trigger}</span></td>
+                                <td>${r.timestamp}</td>
+                                <td>${r.duration}s</td>
+                                <td>${r.size_mb} MB</td>
+                            `;
+                            tbody.appendChild(tr);
+                        }
+                    });
+                }
+                
+                if(tbody.innerHTML === '') { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">No precomputed races found. Background worker is running.</td></tr>'; }
+
+                document.getElementById('total-storage').innerText = totalMB.toFixed(1) + ' MB';
+                if (computeDurations.length > 0) {
+                    const avg = computeDurations.reduce((a, b) => a + b, 0) / computeDurations.length;
+                    document.getElementById('avg-compute').innerText = avg.toFixed(1) + ' s';
+                } else {
+                    document.getElementById('avg-compute').innerText = '0 s';
+                }
+            } catch (e) {
+                document.getElementById('data-tbody').innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--red);">Failed to fetch data.</td></tr>';
+            }
+        }
+
+        function closeDataModal() { document.getElementById('data-modal').classList.remove('open'); }
+        function closeDataIfOutside(e) { if (e.target === document.getElementById('data-modal')) closeDataModal(); }
+
+
+        // ─── 🚨 CANVAS WITH SEQUENTIAL BATCH LOADING ───
+        const TOTAL_FRAMES  = 240;
+        const FRAME_FOLDER  = '/F1_Frames/'; 
+        const FRAME_PREFIX  = 'ezgif-frame-';
+        const FRAME_EXT     = '.png';
+
+        const canvas  = document.getElementById('canvas-bg');
+        const ctx     = canvas.getContext('2d');
+        const heroBlock = document.getElementById('hero-block');
+
+        const images  = new Array(TOTAL_FRAMES);
+        let currentFrame = 0;
+        let targetFrame  = 0;
+
+        function extractBackgroundColor(img) {
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = img.naturalWidth; 
+            tempCanvas.height = img.naturalHeight;
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCtx.drawImage(img, 0, 0);
+            
+            const data = tempCtx.getImageData(20, 20, 1, 1).data;
+            const rgb = `${data[0]}, ${data[1]}, ${data[2]}`;
+            
+            document.documentElement.style.setProperty('--bg-rgb', rgb);
+            document.documentElement.style.setProperty('--bg', `rgb(${rgb})`);
+        }
+
+        let screenW = window.innerWidth;
+        let screenH = window.innerHeight;
+
+        function resizeCanvas(force = false) {
+            if (!force && window.innerWidth === screenW) return;
+            
+            screenW = window.innerWidth;
+            screenH = window.innerHeight;
+
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = screenW * dpr;
+            canvas.height = screenH * dpr;
+            
+            ctx.resetTransform();
+            ctx.scale(dpr, dpr);
+            
+            drawFrame(Math.round(currentFrame));
+        }
+
+        function drawFrame(index) {
+            const img = images[index];
+            if (!img || !img.complete || !img.naturalWidth) return;
+
+            const cw = screenW;
+            const ch = screenH;
+            const iw = img.naturalWidth;
+            const ih = img.naturalHeight;
+            
+            const scale = Math.min(cw / iw, ch / ih); 
+            
+            const dw = iw * scale;
+            const dh = ih * scale;
+            const dx = (cw - dw) / 2;
+            const dy = (ch - dh) / 2;
+
+            ctx.clearRect(0, 0, cw, ch);
+            ctx.drawImage(img, dx, dy, dw, dh);
+        }
+
+        function tick() {
+            requestAnimationFrame(tick);
+            const diff = targetFrame - currentFrame;
+            if (Math.abs(diff) < 0.5) {
+                if (currentFrame !== targetFrame) {
+                    currentFrame = targetFrame;
+                    drawFrame(currentFrame);
+                }
+                return;
+            }
+            currentFrame += diff * 0.18; 
+            drawFrame(Math.round(currentFrame));
+        }
+
+        function onScroll() {
+            const scrollMax = document.body.scrollHeight - window.innerHeight;
+            const scrollRatio = Math.min(Math.max(window.scrollY / scrollMax, 0), 1);
+            targetFrame = Math.round(scrollRatio * (TOTAL_FRAMES - 1));
+            
+            heroBlock.style.opacity = Math.max(0, 1 - (window.scrollY / 400));
+        }
+
+        // 🚨 FIX: Sequential Batch Loader
+        // Loads a chunk of images, waits for them to finish, then loads the next chunk.
+        function loadImagesInBatches(startIndex, batchSize) {
+            if (startIndex >= TOTAL_FRAMES) return; // All frames loaded!
+
+            let loadedThisBatch = 0;
+            const endIndex = Math.min(startIndex + batchSize, TOTAL_FRAMES);
+            const framesToLoad = endIndex - startIndex;
+
+            for (let i = startIndex; i < endIndex; i++) {
+                const img = new Image();
+                const num = String(i + 1).padStart(3, '0');
+                img.src = `${FRAME_FOLDER}${FRAME_PREFIX}${num}${FRAME_EXT}`;
+
+                img.onload = img.onerror = () => {
+                    images[i] = img;
+                    loadedThisBatch++;
+                    
+                    // Once this entire batch is finished, automatically trigger the next batch
+                    if (loadedThisBatch === framesToLoad) {
+                        loadImagesInBatches(endIndex, batchSize);
+                    }
+                };
+            }
+        }
+
+        function initialLoad() {
+            return new Promise(resolve => {
+                // 1. Explicitly load ONLY Frame 1 to start
+                const firstImg = new Image();
+                firstImg.src = `${FRAME_FOLDER}${FRAME_PREFIX}001${FRAME_EXT}`;
+                
+                firstImg.onload = () => {
+                    extractBackgroundColor(firstImg);
+                    images[0] = firstImg;
+                    
+                    // 2. The moment Frame 1 is ready, resolve the promise and unlock the website!
+                    resolve();
+
+                    // 3. Start silently downloading the rest of the images in controlled chunks of 20
+                    loadImagesInBatches(1, 20); 
+                };
+                
+                // Fallback: Unlock the site anyway after 2 seconds if something stalls
+                setTimeout(resolve, 2000);
+            });
+        }
+
+        async function init() {
+            resizeCanvas(true);
+            window.addEventListener('resize', () => resizeCanvas(false));
+            window.addEventListener('scroll', onScroll, { passive: true });
+
+            // Wait for ONLY the first frame
+            await initialLoad();
+            
+            // Hide Loader and start rendering instantly
+            document.getElementById('loader').classList.add('hidden');
+            drawFrame(0);
+            tick();
+        }
+
+        init();
+    </script>
+</body>
+</html>

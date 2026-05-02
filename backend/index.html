@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Brown GP Session Timing</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Titillium+Web:wght@300;400;600;700;900&family=Roboto+Mono:wght@400;500;700&display=swap');
+
+:root {
+    --red: #e10600; --bg: #080a0e; --surface: #0e1117; --surface2: #13161f; --surface3: #1a1d28;
+    --border: #1e2230; --border2: #252838; --text: #f0f0f0; --text-dim: #6b7280; --text-mid: #9ca3af;
+    --green: #00d2be; --yellow: #ffe600; --purple: #c084fc;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: var(--bg); color: var(--text); font-family: 'Titillium Web', sans-serif; min-height: 100vh; padding-bottom: 60px; overflow-x: hidden; }
+.top-bar { position: fixed; top: 0; left: 0; right: 0; height: 3px; background: var(--red); z-index: 100; }
+
+#offline-banner {
+    display: none; background: var(--yellow); color: #000; text-align: center; padding: 6px;
+    font-family: 'Roboto Mono', monospace; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
+    z-index: 90; position: relative; margin-top: 3px;
+}
+
+/* HEADER */
+.page-header { position: sticky; top: 3px; background: var(--surface2); border-bottom: 1px solid var(--border2); padding: 14px 16px 12px; z-index: 50; }
+.header-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.session-eyebrow { font-family: 'Roboto Mono', monospace; font-size: 9px; letter-spacing: 3px; color: var(--red); text-transform: uppercase; margin-bottom: 3px; }
+#session-name { font-size: 18px; font-weight: 900; letter-spacing: -0.3px; line-height: 1.1; }
+.header-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+
+.live-badge {
+    display: flex; align-items: center; gap: 5px; background: rgba(225,6,0,0.12);
+    border: 1px solid rgba(225,6,0,0.3); border-radius: 2px; padding: 3px 8px;
+    font-family: 'Roboto Mono', monospace; font-size: 10px; color: var(--red); letter-spacing: 1px;
+}
+.live-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--red); animation: pulse 1.5s ease-in-out infinite; }
+@keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.7); } }
+
+#session-clock { font-family: 'Roboto Mono', monospace; font-size: 20px; font-weight: 700; color: var(--text); letter-spacing: 2px; }
+
+.recap-announcement {
+    font-size: 24px !important;
+    font-family: 'Titillium Web', sans-serif !important;
+    font-weight: 900 !important;
+    color: var(--yellow) !important;
+    letter-spacing: 0 !important;
+    text-transform: uppercase !important;
+}
+
+/* STANDARD TABLE (Live & Mid-Weekend) */
+.timing-wrap { padding: 12px 0 20px; }
+.col-headers {
+    display: grid; gap: 0; padding: 8px 6px;
+    border-bottom: 2px solid var(--red); position: sticky; top: calc(3px + 88px); background: var(--surface2); z-index: 40;
+}
+.col-h { font-family: 'Roboto Mono', monospace; font-size: 9px; letter-spacing: 1.5px; color: var(--text-dim); text-transform: uppercase; }
+
+.driver-block { border-bottom: 1px solid var(--border); }
+.driver-row { display: grid; gap: 0; padding: 8px 6px; align-items: center; cursor: pointer; transition: background 0.15s; }
+.driver-row:hover, .driver-row.expanded { background: var(--surface3); }
+
+.pos-cell { display: flex; align-items: center; gap: 4px; font-family: 'Roboto Mono', monospace; font-size: 13px; font-weight: 700; color: var(--text); }
+.grid-delta { font-size: 9px; font-family: 'Titillium Web', sans-serif; font-weight: 600; display: flex; align-items: center; width: 12px; }
+.grid-delta.up { color: var(--green); }
+.grid-delta.down { color: var(--red); }
+.grid-delta.even { color: var(--text-dim); }
+
+.team-bar { width: 3px; height: 26px; border-radius: 1px; flex-shrink: 0; }
+.drv-cell { font-size: 15px; font-weight: 700; letter-spacing: 0.5px; }
+
+.tyre-cell { display: flex; align-items: center; justify-content: center; }
+.tyre-dot { width: 20px; height: 20px; border-radius: 50%; border: 2px solid currentColor; display: flex; align-items: center; justify-content: center; font-family: 'Roboto Mono', monospace; font-size: 9px; font-weight: 700; }
+.tyre-age { font-family: 'Roboto Mono', monospace; font-size: 10px; color: var(--text-dim); margin-left: 4px;}
+
+/* PILL UI ELEMENTS */
+.time-pill {
+    background: var(--surface3); border: 1px solid var(--border); border-radius: 4px;
+    padding: 3px 4px; display: inline-block; text-align: center; min-width: 60px;
+    font-family: 'Roboto Mono', monospace; font-size: 12px; font-weight: 700; letter-spacing: -0.5px;
+}
+.time-pill.purple { color: var(--purple); border-color: rgba(192, 132, 252, 0.4); }
+.time-pill.green { color: var(--green); border-color: rgba(0, 210, 190, 0.4); }
+.time-pill.yellow { color: var(--yellow); border-color: rgba(255, 230, 0, 0.4); }
+.time-pill.white { color: var(--text); border-color: var(--border); }
+
+.sector-pill {
+    background: var(--surface3); border-radius: 4px; padding: 4px 0; text-align: center;
+    font-family: 'Roboto Mono', monospace; font-size: 10px; font-weight: 700; width: 100%;
+    border: 1px solid var(--border); letter-spacing: -0.5px;
+}
+.sector-pill.purple { color: var(--purple); border-color: rgba(192, 132, 252, 0.4); }
+.sector-pill.green { color: var(--green); border-color: rgba(0, 210, 190, 0.4); }
+.sector-pill.yellow { color: var(--yellow); border-color: rgba(255, 230, 0, 0.4); }
+.sector-pill.empty { background: transparent; border-color: transparent; }
+
+.gap-cell { font-family: 'Roboto Mono', monospace; font-size: 10px; color: var(--text-mid); }
+.stops-cell { font-family: 'Roboto Mono', monospace; font-size: 12px; font-weight: 700; color: var(--text-dim); text-align: center; }
+
+/* EXPANDED DETAILS */
+.driver-details { display: none; padding: 12px 12px 16px 12px; background: var(--surface3); border-bottom: 1px solid var(--border); }
+.driver-details.open { display: block; }
+.detail-seg { display: flex; flex-direction: column; gap: 2px; }
+.detail-seg-label { font-family: 'Roboto Mono', monospace; font-size: 9px; letter-spacing: 2px; color: var(--text-dim); text-transform: uppercase; }
+.detail-seg-time { font-family: 'Roboto Mono', monospace; font-size: 14px; font-weight: 700; color: var(--text); }
+
+.quali-history-wrap { display: flex; justify-content: space-around; width: 100%; max-width: 350px; margin: 4px auto 0; padding-top: 12px; border-top: 1px solid var(--border); }
+.quali-history-seg { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+
+.tyre-timeline { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+.stint-laps { font-family: 'Roboto Mono', monospace; font-size: 10px; color: var(--text-mid); }
+.stint-line { width: 20px; height: 2px; background: var(--border2); }
+
+/* OFF-WEEK DASHBOARD */
+#dashboard-wrap { display: none; padding: 16px; gap: 16px; max-width: 1200px; margin: 0 auto; }
+@media(min-width: 900px) { #dashboard-wrap { display: grid; grid-template-columns: 1fr 400px; } }
+
+.dash-card { background: var(--surface2); border: 1px solid var(--border2); border-radius: 4px; overflow: hidden; margin-bottom: 16px; }
+.dash-card-header { padding: 12px 16px; border-bottom: 2px solid var(--red); background: var(--surface3); }
+.dash-card-title { font-family: 'Roboto Mono', monospace; font-size: 10px; letter-spacing: 2px; color: var(--red); text-transform: uppercase; }
+.dash-card-subtitle { font-size: 16px; font-weight: 700; margin-top: 2px; }
+
+.mini-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
+.mini-card { background: var(--surface2); border: 1px solid var(--border2); border-radius: 4px; padding: 12px; }
+.mini-card-title { font-family: 'Roboto Mono', monospace; font-size: 9px; color: var(--text-dim); letter-spacing: 1px; margin-bottom: 8px; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+.mini-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; font-size: 12px; }
+.mini-drv { font-weight: 700; display: flex; align-items: center; gap: 6px; }
+.mini-time { font-family: 'Roboto Mono', monospace; font-size: 10px; color: var(--text-mid); }
+
+/* STATUS BAR & OVERLAY */
+#status-bar { position: fixed; bottom: 0; background: var(--surface2); left: 0; right: 0; border-top: 1px solid var(--border2); padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; z-index: 1000; }
+.status-left { display: flex; align-items: center; gap: 12px; }
+.status-dot-wrap { display: flex; align-items: center; gap: 5px; font-family: 'Roboto Mono', monospace; font-size: 10px; color: var(--text-dim); }
+.s-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: pulse 2s ease-in-out infinite; }
+.s-dot.red { background: var(--red); }
+#ws-status { font-family: 'Roboto Mono', monospace; font-size: 10px; color: var(--text-dim); }
+.back-btn { display: flex; align-items: center; gap: 5px; font-family: 'Roboto Mono', monospace; font-size: 10px; color: var(--text-dim); text-decoration: none; padding: 6px 10px; border: 1px solid var(--border); border-radius: 3px; }
+
+#connecting-overlay { position: fixed; inset: 0; background: var(--bg); display: flex; align-items: center; justify-content: center; z-index: 500; flex-direction: column; gap: 16px; }
+.conn-spinner { width: 40px; height: 40px; border: 3px solid var(--border2); border-top-color: var(--red); border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.conn-text { font-family: 'Roboto Mono', monospace; font-size: 11px; letter-spacing: 2px; color: var(--text-dim); text-transform: uppercase; }
+
+</style>
+</head>
+<body>
+
+<div class="top-bar"></div>
+<div id="offline-banner">No active sessions</div>
+
+<div id="connecting-overlay">
+    <div style="font-family:'Roboto Mono',monospace;font-size:9px;letter-spacing:3px;color:var(--red);text-transform:uppercase;margin-bottom:8px;">Brown GP</div>
+    <div class="conn-spinner"></div>
+    <div class="conn-text" id="conn-text">Connecting to telemetry...</div>
+</div>
+
+<div class="page-header">
+    <div class="header-top">
+        <div class="header-left">
+            <div class="session-eyebrow" id="header-eyebrow">Live Session</div>
+            <div id="session-name"></div>
+        </div>
+        <div class="header-right">
+            <div class="live-badge" id="live-badge-ui"><div class="live-dot"></div>LIVE</div>
+            <div id="session-clock">--:--</div>
+        </div>
+    </div>
+</div>
+
+<div class="timing-wrap" id="standard-wrap">
+    <div class="col-headers" id="std-headers"></div>
+    <div id="timing-table"></div>
+</div>
+
+<div id="dashboard-wrap">
+    <div class="dash-left">
+        <div class="dash-card">
+            <div class="dash-card-header">
+                <div class="dash-card-title">Final Classification</div>
+                <div class="dash-card-subtitle">Race Results</div>
+            </div>
+            <div class="col-headers" style="position:static; grid-template-columns: 45px 36px 80px 1fr 70px 60px;">
+                <div class="col-h">Pos</div><div class="col-h"></div><div class="col-h">Driver</div><div class="col-h"></div><div class="col-h">Gap</div><div class="col-h">Pits</div>
+            </div>
+            <div id="dash-race-table"></div>
+        </div>
+    </div>
+    
+    <div class="dash-right">
+        <div class="mini-grid" id="fp-cards"></div>
+        
+        <div class="dash-card">
+            <div class="dash-card-header">
+                <div class="dash-card-title">Starting Grid</div>
+                <div class="dash-card-subtitle">Qualifying</div>
+            </div>
+            <div class="col-headers" style="position:static; grid-template-columns: 35px 30px 1fr 60px 60px 60px;">
+                <div class="col-h">P</div><div class="col-h"></div><div class="col-h">Driver</div><div class="col-h">Q1</div><div class="col-h">Q2</div><div class="col-h">Q3</div>
+            </div>
+            <div id="dash-quali-table"></div>
+        </div>
+    </div>
+</div>
+
+<div id="status-bar">
+    <div class="status-left">
+        <div class="status-dot-wrap"><div class="s-dot" id="ws-dot"></div><span id="ws-status">Connecting</span></div>
+    </div>
+    <a href="/" class="back-btn">Home</a>
+</div>
+
+<script>
+let LIVE_DATA = { SessionInfo: {}, TimingData: {}, TimingAppData: {}, DriverList: {} };
+let expandedDrivers = new Set();
+let ws;
+
+const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+
+function connectWS() {
+    ws = new WebSocket(`${proto}//${location.host}/ws`);
+    ws.onopen = () => { document.getElementById('ws-dot').className = 's-dot'; document.getElementById('ws-status').innerText = 'Live'; };
+    ws.onclose = () => { document.getElementById('ws-dot').className = 's-dot red'; document.getElementById('ws-status').innerText = 'Disconnected'; setTimeout(connectWS, 3000); };
+    ws.onmessage = e => {
+        try {
+            const msg = JSON.parse(e.data);
+            if (msg.SessionInfo) LIVE_DATA.SessionInfo = { ...LIVE_DATA.SessionInfo, ...msg.SessionInfo };
+            if (msg.TimingData) mergeDeep(LIVE_DATA.TimingData, msg.TimingData);
+            if (msg.TimingAppData) mergeDeep(LIVE_DATA.TimingAppData, msg.TimingAppData);
+            if (msg.DriverList) mergeDeep(LIVE_DATA.DriverList, msg.DriverList);
+            render();
+        } catch (err) {}
+    };
+}
+
+function mergeDeep(target, source) {
+    if (!source || typeof source !== 'object') return;
+    Object.keys(source).forEach(k => {
+        if (source[k] && typeof source[k] === 'object' && !Array.isArray(source[k])) {
+            if (!target[k]) target[k] = {};
+            mergeDeep(target[k], source[k]);
+        } else { target[k] = source[k]; }
+    });
+}
+
+async function fetchInitial() {
+    try {
+        const [session, timing, timingApp, drivers] = await Promise.all([
+            fetch('/api/session').then(r => r.json()),
+            fetch('/api/timing').then(r => r.json()),
+            fetch('/api/timingapp').then(r => r.json()),
+            fetch('/api/drivers').then(r => r.json())
+        ]);
+        LIVE_DATA.SessionInfo = session;
+        LIVE_DATA.TimingData = timing;
+        LIVE_DATA.TimingAppData = timingApp;
+        LIVE_DATA.DriverList = drivers;
+        document.getElementById('connecting-overlay').style.display = 'none';
+        render();
+        connectWS();
+    } catch (e) {
+        document.getElementById('conn-text').innerText = 'Failed to connect. Retrying...';
+        setTimeout(fetchInitial, 3000);
+    }
+}
+
+function getTyreColor(compound) {
+    return compound === 'H' ? '#ffffff' : compound === 'M' ? '#ffe600' : compound === 'S' ? '#ff2a2a' : compound === 'I' ? '#00e640' : compound === 'W' ? '#0088ff' : '#888';
+}
+
+function render() {
+    const si = LIVE_DATA.SessionInfo;
+    if (!si || Object.keys(si).length === 0) {
+        document.getElementById('session-name').innerHTML = '<span style="color:var(--text-dim); font-size:14px;">AWAITING F1 TELEMETRY...</span>';
+        document.getElementById('live-badge-ui').style.display = 'none';
+        return;
+    }
+
+    if (si.RecapData && si.RecapData.is_recap) {
+        // RECAP MODE
+        document.getElementById('offline-banner').style.display = 'block';
+        document.getElementById('live-badge-ui').style.display = 'none';
+        document.getElementById('header-eyebrow').innerText = 'PREVIOUSLY ON FORMULA 1';
+        document.getElementById('header-eyebrow').classList.add('recap-announcement');
+        document.getElementById('session-name').innerText = `${si.RecapData.event_name} - ${si.RecapData.last_session}`;
+        document.getElementById('session-clock').innerText = 'Archive';
+
+        if (si.RecapData.recap_mode === 'off_week') {
+            document.getElementById('standard-wrap').style.display = 'none';
+            document.getElementById('dashboard-wrap').style.display = 'grid';
+            renderOffWeekDashboard(si.RecapData);
+        } else {
+            document.getElementById('standard-wrap').style.display = 'block';
+            document.getElementById('dashboard-wrap').style.display = 'none';
+            renderMidWeekendTable(si.RecapData);
+        }
+    } else {
+        // LIVE MODE
+        document.getElementById('offline-banner').style.display = 'none';
+        document.getElementById('live-badge-ui').style.display = 'flex';
+        document.getElementById('header-eyebrow').innerText = 'Live Session';
+        document.getElementById('header-eyebrow').classList.remove('recap-announcement');
+        document.getElementById('session-name').innerText = `${si.Meeting?.Name || ''} ${si.Name || ''}`;
+        document.getElementById('session-clock').innerText = si.SessionTimeToSession || si.TimeOfDay || '--:--';
+        
+        document.getElementById('standard-wrap').style.display = 'block';
+        document.getElementById('dashboard-wrap').style.display = 'none';
+        renderLiveTable();
+    }
+}
+
+function renderLiveTable() {
+    const td = LIVE_DATA.TimingData; const tad = LIVE_DATA.TimingAppData; const dl = LIVE_DATA.DriverList;
+    if (!td || !td.Lines) return;
+    
+    // SURGICAL FIX: 9-Column Wide Layout for Live Timing
+    const liveGridTemplate = "25px 10px 45px 32px 70px 45px 1fr 1fr 1fr";
+    
+    const stdHeaders = document.getElementById('std-headers');
+    stdHeaders.style.gridTemplateColumns = liveGridTemplate;
+    stdHeaders.innerHTML = `
+        <div class="col-h">Pos</div><div class="col-h"></div><div class="col-h">Driver</div>
+        <div class="col-h" style="text-align:center;">Tyre</div><div class="col-h" style="text-align:center;">Time</div><div class="col-h">Gap</div>
+        <div class="col-h" style="text-align:center;">S1</div><div class="col-h" style="text-align:center;">S2</div><div class="col-h" style="text-align:center;">S3</div>
+    `;
+
+    const drivers = Object.entries(td.Lines).map(([num, data]) => ({ num, data, driverInfo: dl[num] || {} })).sort((a, b) => (parseInt(a.data.Position) || 99) - (parseInt(b.data.Position) || 99));
+    const table = document.getElementById('timing-table');
+    const isQual = (LIVE_DATA.SessionInfo?.Name || '').toLowerCase().includes('qual');
+    const qPrefix = (LIVE_DATA.SessionInfo?.Name || '').toLowerCase().includes('sprint') ? 'SQ' : 'Q';
+
+    table.innerHTML = '';
+
+    drivers.forEach((drv, idx) => {
+        const pos = drv.data.Position || (idx + 1);
+        const name = drv.driverInfo.Tla || drv.driverInfo.Abbreviation || drv.num;
+        const tc = '#' + (drv.driverInfo.TeamColour || 'ffffff').replace('#','');
+        
+        let compound = '?', tyreAge = '';
+        const tyreData = tad?.Lines?.[drv.num]?.Stints;
+        if (tyreData) {
+            const stints = Object.values(tyreData);
+            if (stints.length > 0) {
+                const last = stints[stints.length - 1];
+                compound = (last.Compound || '?')[0]; 
+                // Only show tyre age if it has laps on it
+                if(last.TotalLaps > 0) { tyreAge = `<span class="tyre-age">${last.TotalLaps}</span>`; }
+            }
+        }
+        
+        // 1. BEST LAP TIME & COLORING PILL
+        const bestLapObj = drv.data.BestLapTime;
+        const bestLap = bestLapObj?.Value || drv.data.LastLapTime?.Value || '-';
+        const lapClass = bestLapObj?.OverallFastest ? 'purple' : bestLapObj?.PersonalFastest ? 'green' : (bestLap !== '-' ? 'yellow' : 'white');
+        
+        // 2. GAP TO LEADER (Handling Quali specifically!)
+        let gap = '-';
+        if (pos == 1) {
+            gap = 'Leader';
+        } else {
+            gap = drv.data.TimeDiffToFastest || drv.data.GapToLeader || drv.data.TimeDiffToPositionAhead || '-';
+        }
+
+        const isExpanded = expandedDrivers.has(drv.num);
+        
+        // 3. LIVE SECTORS (S1, S2, S3) FOR MAIN ROW
+        let s1_val = '', s1_class = 'empty';
+        let s2_val = '', s2_class = 'empty';
+        let s3_val = '', s3_class = 'empty';
+        
+        [0, 1, 2].forEach(i => {
+            let sInfo = drv.data.Sectors?.[i] || drv.data.Sectors?.[i.toString()];
+            let val = sInfo?.Value || '';
+            let sClass = sInfo?.OverallFastest ? 'purple' : sInfo?.PersonalFastest ? 'green' : (val ? 'yellow' : 'empty');
+            if (i===0) { s1_val = val; s1_class = sClass; }
+            if (i===1) { s2_val = val; s2_class = sClass; }
+            if (i===2) { s3_val = val; s3_class = sClass; }
+        });
+
+        // 4. EXPANDED VIEW: Quali Centered History OR Race Pit Stops
+        let detailHtml = '';
+        if (isQual) {
+            let qHtml = [0, 1, 2].map(i => {
+                let val = '';
+                if (Array.isArray(drv.data.BestLapTimes)) {
+                    val = drv.data.BestLapTimes[i]?.Value || '';
+                } else if (drv.data.BestLapTimes && typeof drv.data.BestLapTimes === 'object') {
+                    val = drv.data.BestLapTimes[i]?.Value || drv.data.BestLapTimes[i.toString()]?.Value || '';
+                }
+                return `<div class="quali-history-seg"><div class="detail-seg-label">${qPrefix}${i+1}</div><div class="detail-seg-time white">${val || '-'}</div></div>`;
+            }).join('');
+            detailHtml = `<div class="quali-history-wrap">${qHtml}</div>`;
+        } else {
+            const stops = tyreData ? Object.values(tyreData).length - 1 : 0;
+            detailHtml = `<div class="quali-history-wrap"><div class="quali-history-seg"><div class="detail-seg-label">PITS</div><div class="detail-seg-time white">${stops}</div></div></div>`;
+        }
+
+        table.innerHTML += `
+            <div class="driver-block" id="drv-${drv.num}">
+                <div class="driver-row ${isExpanded ? 'expanded' : ''}" style="grid-template-columns: ${liveGridTemplate};" onclick="toggleDriver('${drv.num}')">
+                    <div class="pos-cell"><div class="grid-delta even">-</div><span class="pos-num">${pos}</span></div>
+                    <div style="display:flex;align-items:center;"><div class="team-bar" style="background:${tc};"></div></div>
+                    <div class="drv-cell">${name}</div>
+                    <div class="tyre-cell"><div class="tyre-dot" style="color:${getTyreColor(compound)}; border-color:${getTyreColor(compound)};">${compound}</div>${tyreAge}</div>
+                    <div class="time-cell" style="text-align:center;"><div class="time-pill ${lapClass}">${bestLap}</div></div>
+                    <div class="gap-cell">${gap}</div>
+                    <div style="padding:0 2px;"><div class="sector-pill ${s1_class}">${s1_val}</div></div>
+                    <div style="padding:0 2px;"><div class="sector-pill ${s2_class}">${s2_val}</div></div>
+                    <div style="padding:0 2px;"><div class="sector-pill ${s3_class}">${s3_val}</div></div>
+                </div>
+                <div class="driver-details ${isExpanded ? 'open' : ''}" id="detail-${drv.num}">${detailHtml}</div>
+            </div>`;
+    });
+}
+
+function renderMidWeekendTable(recap) {
+    const stdHeaders = document.getElementById('std-headers');
+    stdHeaders.style.gridTemplateColumns = "45px 36px 80px 1fr 70px 60px";
+    stdHeaders.innerHTML = `
+        <div class="col-h">Pos</div><div class="col-h"></div><div class="col-h">Driver</div>
+        <div class="col-h"></div><div class="col-h">${recap.session_type === 'Race' ? 'Gap' : 'Time'}</div><div class="col-h">Pits</div>
+    `;
+    
+    const table = document.getElementById('timing-table');
+    table.innerHTML = '';
+    
+    recap.results.forEach((drv, idx) => {
+        const isExpanded = expandedDrivers.has(drv.driver);
+        let detailHtml = '';
+        
+        if (recap.session_type === 'Qualifying') {
+            detailHtml = `
+                <div class="quali-history-wrap">
+                    <div class="quali-history-seg"><div class="detail-seg-label">Q1</div><div class="detail-seg-time">${drv.q1 || '-'}</div></div>
+                    <div class="quali-history-seg"><div class="detail-seg-label">Q2</div><div class="detail-seg-time">${drv.q2 || '-'}</div></div>
+                    <div class="quali-history-seg"><div class="detail-seg-label">Q3</div><div class="detail-seg-time">${drv.q3 || '-'}</div></div>
+                </div>
+            `;
+        } else if (recap.session_type === 'Race' && drv.stints) {
+            detailHtml += `<div class="detail-seg" style="padding-left:12px;"><div class="detail-seg-label">Strategy</div><div class="tyre-timeline">`;
+            drv.stints.forEach((s, i) => {
+                detailHtml += `<div class="tyre-dot" style="color:${getTyreColor(s.tyre)}; border-color:${getTyreColor(s.tyre)};">${s.tyre}</div>`;
+                detailHtml += `<div class="stint-laps">${s.laps} Laps</div>`;
+                if (i < drv.stints.length - 1) detailHtml += `<div class="stint-line"></div>`;
+            });
+            detailHtml += `</div></div>`;
+        }
+
+        let gridArrow = '<div class="grid-delta even">-</div>';
+        if (drv.grid > 0 && drv.pos !== 99) {
+            const diff = drv.grid - drv.pos;
+            if (diff > 0) gridArrow = `<div class="grid-delta up">▲${diff}</div>`;
+            if (diff < 0) gridArrow = `<div class="grid-delta down">▼${Math.abs(diff)}</div>`;
+        }
+        
+        const timeVal = recap.session_type === 'Race' ? drv.gap : (drv.q3 || drv.q2 || drv.q1 || drv.time || '-');
+        
+        table.innerHTML += `
+            <div class="driver-block" id="drv-${drv.driver}">
+                <div class="driver-row ${isExpanded ? 'expanded' : ''}" style="grid-template-columns: 45px 36px 80px 1fr 70px 60px;" onclick="toggleDriver('${drv.driver}')">
+                    <div class="pos-cell">${gridArrow}<span class="pos-num">${drv.pos === 99 ? 'NC' : drv.pos}</span></div>
+                    <div style="display:flex;align-items:center;"><div class="team-bar" style="background:${drv.color};"></div></div>
+                    <div class="drv-cell">${drv.driver}</div>
+                    <div class="tyre-cell"></div>
+                    <div class="time-cell ${drv.fastest ? 'purple' : 'white'}">${timeVal}</div>
+                    <div class="stops-cell">${drv.stops !== undefined ? drv.stops : '-'}</div>
+                </div>
+                <div class="driver-details ${isExpanded ? 'open' : ''}" id="detail-${drv.driver}">${detailHtml}</div>
+            </div>`;
+    });
+}
+
+function renderOffWeekDashboard(recap) {
+    // 1. Render Race Table
+    const rt = document.getElementById('dash-race-table');
+    rt.innerHTML = '';
+    recap.race.forEach(drv => {
+        const isExpanded = expandedDrivers.has(drv.driver);
+        let detailHtml = `<div class="detail-seg"><div class="detail-seg-label">Strategy</div><div class="tyre-timeline">`;
+        if (drv.stints) {
+            drv.stints.forEach((s, i) => {
+                detailHtml += `<div class="tyre-dot" style="color:${getTyreColor(s.tyre)}; border-color:${getTyreColor(s.tyre)};">${s.tyre}</div>`;
+                detailHtml += `<div class="stint-laps">${s.laps} Laps</div>`;
+                if (i < drv.stints.length - 1) detailHtml += `<div class="stint-line"></div>`;
+            });
+        }
+        detailHtml += `</div></div>`;
+        
+        let gridArrow = '<div class="grid-delta even">-</div>';
+        if (drv.grid > 0 && drv.pos !== 99) {
+            const diff = drv.grid - drv.pos;
+            if (diff > 0) gridArrow = `<div class="grid-delta up">▲${diff}</div>`;
+            if (diff < 0) gridArrow = `<div class="grid-delta down">▼${Math.abs(diff)}</div>`;
+        }
+
+        rt.innerHTML += `
+            <div class="driver-block">
+                <div class="driver-row ${isExpanded ? 'expanded' : ''}" style="grid-template-columns: 45px 36px 80px 1fr 70px 60px;" onclick="toggleDriver('${drv.driver}')">
+                    <div class="pos-cell">${gridArrow}<span class="pos-num">${drv.pos === 99 ? 'NC' : drv.pos}</span></div>
+                    <div style="display:flex;align-items:center;"><div class="team-bar" style="background:${drv.color};"></div></div>
+                    <div class="drv-cell">${drv.driver}</div>
+                    <div class="tyre-cell"></div>
+                    <div class="time-cell ${drv.fastest ? 'purple' : 'white'}">${drv.gap}</div>
+                    <div class="stops-cell">${drv.stops}</div>
+                </div>
+                <div class="driver-details ${isExpanded ? 'open' : ''}" id="detail-${drv.driver}">${detailHtml}</div>
+            </div>`;
+    });
+
+    // 2. Render Quali Table
+    const qt = document.getElementById('dash-quali-table');
+    qt.innerHTML = '';
+    recap.quali.forEach(drv => {
+        qt.innerHTML += `
+            <div class="driver-block">
+                <div class="driver-row" style="grid-template-columns: 35px 30px 1fr 60px 60px 60px; cursor:default;">
+                    <div class="pos-cell"><span class="pos-num">${drv.pos}</span></div>
+                    <div style="display:flex;align-items:center;"><div class="team-bar" style="background:${drv.color};"></div></div>
+                    <div class="drv-cell">${drv.driver}</div>
+                    <div class="gap-cell" style="color:var(--text-mid);">${drv.q1 || '-'}</div>
+                    <div class="gap-cell" style="color:var(--text);">${drv.q2 || '-'}</div>
+                    <div class="gap-cell" style="color:var(--yellow); font-weight:700;">${drv.q3 || '-'}</div>
+                </div>
+            </div>`;
+    });
+
+    // 3. Render FP Cards
+    const fc = document.getElementById('fp-cards');
+    fc.innerHTML = '';
+    ['fp1', 'fp2', 'fp3'].forEach(fp => {
+        if (recap[fp] && recap[fp].length > 0) {
+            let inner = '';
+            recap[fp].forEach(d => { inner += `<div class="mini-row"><div class="mini-drv"><div class="team-bar" style="height:12px;background:${d.color};"></div> ${d.driver}</div><div class="mini-time">${d.time}</div></div>`; });
+            fc.innerHTML += `<div class="mini-card"><div class="mini-card-title">${fp.toUpperCase()}</div>${inner}</div>`;
+        }
+    });
+}
+
+function toggleDriver(num) {
+    if (expandedDrivers.has(num)) {
+        expandedDrivers.delete(num);
+        document.getElementById(`detail-${num}`)?.classList.remove('open');
+        document.querySelector(`#drv-${num} .driver-row`)?.classList.remove('expanded');
+    } else {
+        expandedDrivers.add(num);
+        document.getElementById(`detail-${num}`)?.classList.add('open');
+        document.querySelector(`#drv-${num} .driver-row`)?.classList.add('expanded');
+    }
+}
+
+setInterval(() => {
+    const el = document.getElementById('session-clock');
+    if (el && el.innerText !== '--:--' && el.innerText !== 'Archive' && !el.innerText.includes(':')) return;
+}, 1000);
+
+fetchInitial();
+</script>
+</body>
+</html>
