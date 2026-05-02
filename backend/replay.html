@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Brown GP | Time Machine</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Titillium+Web:wght@300;400;600;700;900&family=Roboto+Mono:wght@400;500;700&display=swap');
+
+:root {
+    --red: #e10600;
+    --red-dim: rgba(225,6,0,0.15);
+    --bg: #080a0e;
+    --surface: #0e1117;
+    --surface2: #13161f;
+    --surface3: #1a1d28;
+    --border: #1e2230;
+    --border2: #252838;
+    --text: #f0f0f0;
+    --text-dim: #6b7280;
+    --text-mid: #9ca3af;
+    --green: #00d2be;
+    --yellow: #ffe600;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: var(--bg); color: var(--text); font-family: 'Titillium Web', sans-serif; overflow-x: hidden; min-height: 100vh; }
+.top-bar { position: fixed; top: 0; left: 0; right: 0; height: 3px; background: var(--red); z-index: 100; }
+
+#overlay-screen { position: fixed; inset: 0; background: rgba(8,10,14,0.96); z-index: 2000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(8px); }
+
+.setup-card { background: var(--surface2); border: 1px solid var(--border2); border-top: 3px solid var(--red); border-radius: 4px; padding: 36px 28px; width: 90%; max-width: 380px; box-shadow: 0 24px 60px rgba(0,0,0,0.8); }
+.setup-card-header { margin-bottom: 28px; }
+.setup-eyebrow { font-family: 'Roboto Mono', monospace; font-size: 10px; letter-spacing: 3px; color: var(--red); text-transform: uppercase; margin-bottom: 8px; }
+.setup-card h2 { font-size: 28px; font-weight: 900; letter-spacing: -0.5px; line-height: 1; }
+.setup-card h2 span { color: var(--red); }
+
+.setup-selects { display: flex; gap: 10px; margin-bottom: 10px; }
+.select-wrap { flex: 1; position: relative; }
+.select-wrap label { display: block; font-family: 'Roboto Mono', monospace; font-size: 9px; letter-spacing: 2px; color: var(--text-dim); text-transform: uppercase; margin-bottom: 6px; }
+select { width: 100%; padding: 11px 12px; background: var(--surface); color: var(--text); border: 1px solid var(--border2); border-radius: 3px; font-size: 14px; font-weight: 600; font-family: 'Titillium Web', sans-serif; outline: none; cursor: pointer; }
+select:focus { border-color: var(--red); }
+
+.precomputed-link { text-align: center; margin-top: 6px; margin-bottom: 20px; font-size: 11px; color: var(--text-dim); }
+.precomputed-link a { display: inline-flex; align-items: center; gap: 5px; color: var(--green); text-decoration: none; border-bottom: 1px dashed var(--green); font-family: 'Roboto Mono', monospace; font-weight: 700; margin-bottom: 6px; padding-bottom: 2px;}
+.precomputed-link span { display: block; font-size: 9px; color: var(--text-dim); }
+
+.btn-stream { width: 100%; background: var(--red); color: white; border: none; padding: 16px; border-radius: 3px; font-size: 14px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; font-family: 'Titillium Web', sans-serif; cursor: pointer; transition: background 0.15s, transform 0.1s; display: flex; align-items: center; justify-content: center; gap: 10px; }
+.btn-stream:hover { background: #ff1a1a; }
+.btn-stream:active { transform: scale(0.98); }
+
+/* PRECOMPUTED MODAL */
+#precomp-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 3000; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
+#precomp-modal.open { display: flex; }
+.precomp-box { background: var(--surface2); border: 1px solid var(--border2); border-top: 3px solid var(--green); border-radius: 4px; width: 90%; max-width: 360px; max-height: 75vh; display: flex; flex-direction: column; box-shadow: 0 20px 50px rgba(0,0,0,0.8); }
+.precomp-header { padding: 16px 18px 12px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+.precomp-title { font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.close-modal { color: var(--text-dim); cursor: pointer; font-size: 18px; border: none; background: none; line-height: 1; }
+.close-modal:hover { color: var(--text); }
+.precomp-body { padding: 12px 18px 16px; overflow-y: auto; flex: 1; }
+.precomp-body::-webkit-scrollbar { width: 4px; }
+.precomp-body::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+.year-group { margin-bottom: 16px; }
+.year-title { font-family: 'Roboto Mono', monospace; font-size: 10px; letter-spacing: 3px; color: var(--text-dim); text-transform: uppercase; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px solid var(--border); }
+.popup-race-item { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 13px; color: var(--text-mid); cursor: pointer; }
+.popup-race-item.cached { color: var(--text); }
+.popup-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; background: var(--border2); }
+.popup-dot.cached { background: var(--green); }
+.precomp-footer { padding: 10px 18px 14px; border-top: 1px solid var(--border); font-family: 'Roboto Mono', monospace; font-size: 9px; color: var(--text-dim); letter-spacing: 0.5px; flex-shrink: 0; line-height: 1.5; }
+
+/* Loading */
+#loading-panel { display: none; }
+.loading-steps { margin-top: 20px; }
+.load-step { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text-dim); transition: color 0.3s; }
+.load-step.active { color: var(--text); }
+.load-step.done { color: var(--green); }
+.step-icon { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--border2); display: flex; align-items: center; justify-content: center; font-size: 10px; flex-shrink: 0; }
+.load-step.active .step-icon { border-color: var(--red); animation: spin-ring 1s linear infinite; }
+.load-step.done .step-icon { border-color: var(--green); background: rgba(0,210,190,0.1); color: var(--green); }
+@keyframes spin-ring { 0% { box-shadow: inset 0 0 0 2px transparent, 2px 0 0 0 var(--red); } 100% { transform: rotate(360deg); } }
+.progress-bar-wrap { margin-top: 20px; height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; }
+.progress-bar-fill { height: 100%; background: var(--red); width: 0%; transition: width 0.5s ease; }
+#error-box2 { display: none; background: rgba(225,6,0,0.08); border: 1px solid rgba(225,6,0,0.3); color: #ff9999; padding: 12px; border-radius: 3px; margin-top: 16px; font-family: 'Roboto Mono', monospace; font-size: 11px; white-space: pre-wrap; }
+
+/* Main */
+#main-container { padding: 60px 16px 100px; max-width: 800px; margin: 0 auto; }
+.page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+.page-eyebrow { font-family: 'Roboto Mono', monospace; font-size: 9px; letter-spacing: 3px; color: var(--red); text-transform: uppercase; margin-bottom: 4px; }
+.title-group { display: flex; align-items: center; }
+#race-title { font-size: 20px; font-weight: 900; letter-spacing: -0.3px; margin-right: 15px; }
+#lap-counter { font-family: 'Roboto Mono', monospace; font-size: 14px; font-weight: 600; color: var(--text-dim); }
+.back-btn { display: flex; align-items: center; gap: 6px; font-family: 'Roboto Mono', monospace; font-size: 10px; letter-spacing: 1px; color: var(--text-dim); text-decoration: none; padding: 8px 12px; border: 1px solid var(--border); border-radius: 3px; transition: color 0.2s, border-color 0.2s; }
+.back-btn:hover { color: var(--text); border-color: var(--border2); }
+.section-header { display: flex; align-items: center; gap: 12px; margin: 24px 0 12px; }
+.section-label { font-family: 'Roboto Mono', monospace; font-size: 9px; letter-spacing: 3px; color: var(--text-dim); text-transform: uppercase; }
+.section-line { flex: 1; height: 1px; background: var(--border); }
+
+/* Worm Box */
+.worm-box { background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; position: relative; height: 550px; overflow-y: auto; overflow-x: hidden; padding: 20px 0; }
+.worm-box::-webkit-scrollbar { width: 4px; }
+.worm-box::-webkit-scrollbar-track { background: transparent; }
+.worm-box::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+#spine { position: absolute; left: 50%; transform: translateX(-50%); width: 2px; background: linear-gradient(to bottom, #666, rgba(225,6,0,0.2)); top: 0; z-index: 1; }
+.worm-row { position: absolute; left: 50%; transform: translateX(-50%); display: flex; align-items: center; transition: top 0.25s linear; z-index: 2; width: 340px; justify-content: center; }
+.worm-car { width: 26px; height: 12px; border-radius: 2px; z-index: 3; position: relative; flex-shrink: 0; border: 1px solid #111; }
+.worm-text { width: 145px; font-family: 'Roboto Mono', monospace; font-size: 11px; font-weight: 500; color: var(--text-mid); }
+.worm-text-placeholder { width: 145px; }
+.left-align .worm-text { text-align: right; padding-right: 14px; }
+.right-align .worm-text { text-align: left; padding-left: 14px; }
+.worm-pos { color: var(--text-dim); font-size: 10px; display: inline-block; margin-right: 4px; }
+.worm-name { color: var(--text); font-weight: 700; font-size: 12px; display: inline-block; width: 30px; }
+.worm-gap { color: var(--red); font-size: 10px; display: inline-block; width: 60px; }
+
+/* Map Box & Joystick */
+.map-box { background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; position: relative; height: 420px; overflow: hidden; touch-action: none; }
+#trackCanvas { width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
+#trackCanvas:active { cursor: grabbing; }
+
+#joystick-zone { position: absolute; bottom: 15px; right: 15px; width: 100px; height: 100px; background: rgba(255,255,255,0.05); border-radius: 50%; border: 2px solid rgba(255,255,255,0.1); display: flex; justify-content: center; align-items: center; touch-action: none; z-index: 50; box-shadow: inset 0 0 20px rgba(0,0,0,0.5); }
+#joystick-knob { width: 40px; height: 40px; background: linear-gradient(135deg, var(--red), #800000); border-radius: 50%; box-shadow: 0 4px 10px rgba(0,0,0,0.8), inset 0 2px 5px rgba(255,255,255,0.2); pointer-events: none; transition: transform 0.1s ease-out; }
+
+/* Race Control */
+.rcm-box { background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; height: 180px; overflow-y: auto; padding: 12px; }
+.rcm-box::-webkit-scrollbar { width: 4px; }
+.rcm-box::-webkit-scrollbar-track { background: transparent; }
+.rcm-box::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+.rcm-msg { padding: 8px 0; border-bottom: 1px solid var(--border); font-family: 'Roboto Mono', monospace; font-size: 11px; color: var(--text-mid); line-height: 1.5; }
+.rcm-msg:last-child { border-bottom: none; }
+.rcm-time { color: var(--red); font-weight: 700; margin-right: 8px; }
+.rcm-flag-yellow { color: var(--yellow); }
+.rcm-flag-red { color: var(--red); }
+.rcm-flag-green { color: var(--green); }
+
+/* Playback bar */
+#playback-bar { position: fixed; bottom: 0; left: 0; right: 0; background: var(--surface2); border-top: 1px solid var(--border2); padding: 10px 16px; display: flex; align-items: center; gap: 12px; z-index: 1000; }
+.pb-btn { background: var(--surface3); color: var(--text); border: 1px solid var(--border2); width: 36px; height: 36px; border-radius: 3px; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background 0.15s; }
+.pb-btn:hover { background: var(--border2); }
+#clock-display { font-family: 'Roboto Mono', monospace; font-size: 14px; font-weight: 700; color: var(--text); min-width: 70px; flex-shrink: 0; }
+
+.buffer-badge { font-family: 'Roboto Mono', monospace; font-size: 9px; letter-spacing: 2px; color: var(--yellow); background: rgba(255,230,0,0.1); border: 1px solid rgba(255,230,0,0.3); padding: 2px 6px; border-radius: 2px; animation: blink 1s ease-in-out infinite; }
+@keyframes blink { 0%, 100%{opacity: 1} 50% {opacity:0.3} }
+
+#timeline { flex: 1; -webkit-appearance: none; height: 3px; background: var(--border2); border-radius: 2px; outline: none; }
+#timeline::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: var(--red); cursor: pointer; box-shadow: 0 0 8px rgba(225,6,0,0.5); }
+.speed-group { display: flex; gap: 4px; flex-shrink: 0; }
+.speed-btn { background: var(--surface3); color: var(--text-dim); border: 1px solid var(--border); padding: 6px 10px; border-radius: 3px; font-family: 'Roboto Mono', monospace; font-size: 11px; font-weight: 700; cursor: pointer; transition: all 0.15s; }
+.speed-btn.active { background: var(--red); color: white; border-color: var(--red); }
+</style>
+</head>
+<body>
+
+<div class="top-bar"></div>
+
+<div id="precomp-modal" onclick="closePopupIfOutside(event)">
+    <div class="precomp-box">
+        <div class="precomp-header">
+            <div class="precomp-title"><span style="color:var(--green);">●</span> Precomputed Races</div>
+            <button class="close-modal" onclick="closeCachePopup()">×</button>
+        </div>
+        <div class="precomp-body" id="precomp-list">
+            <div style="color:var(--text-dim); font-size: 12px; text-align: center;">Fetching server cache...</div>
+        </div>
+        <div class="precomp-footer">
+            ● Green dot = instant replay <br> ● Grey dot = loads on first request and saves for next time
+        </div>
+    </div>
+</div>
+
+<div id="overlay-screen">
+    <div class="setup-card">
+        <div id="setup-panel">
+            <div class="setup-card-header">
+                <div class="setup-eyebrow">Brown GP</div>
+                <h2>Time <span>Machine</span></h2>
+            </div>
+            <div class="setup-selects">
+                <div class="select-wrap">
+                    <label>Season</label>
+                    <select id="year-select" onchange="updateTracks()"></select>
+                </div>
+                <div class="select-wrap">
+                    <label>Circuit</label>
+                    <select id="track-select"></select>
+                </div>
+            </div>
+            <div class="precomputed-link">
+                <a href="#" onclick="openCachePopup(); return false;">View Precomputed Races</a>
+                <span>* Other race replays might take longer to load.</span>
+            </div>
+            <button class="btn-stream" id="load-btn" onclick="startStream()">
+                <span>▶</span> Stream Race
+            </button>
+        </div>
+
+        <div id="loading-panel">
+            <div class="setup-eyebrow">Brown GP Time Machine</div>
+            <div id="loading-title" style="font-size: 18px; font-weight:700;margin-bottom:4px;">Loading Race Data</div>
+            <div id="loading-subtitle" style="font-family:'Roboto Mono', monospace; font-size:10px;color:var(--text-dim);margin-bottom:20px; letter-spacing:1px;"></div>
+
+            <div id="cache-load-panel" style="display:none;text-align:center;padding: 10px 0 20px;">
+                <div style="font-size:32px;margin-bottom:12px;">⚡</div>
+                <div style="font-size:14px;font-weight:700;color:var(--green); margin-bottom: 6px;">Loading from cache</div>
+                <div style="font-family:'Roboto Mono', monospace; font-size:10px;color:var(--text-dim);">Previously computed - ready in seconds</div>
+            </div>
+
+            <div id="compute-load-panel">
+                <div class="loading-steps">
+                    <div class="load-step" id="step-connect"><div class="step-icon">1</div><span>Connecting to backend</span></div>
+                    <div class="load-step" id="step-download"><div class="step-icon">2</div><span>Downloading session data</span></div>
+                    <div class="load-step" id="step-map"><div class="step-icon">3</div><span>Extracting map & pitlane</span></div>
+                    <div class="load-step" id="step-drivers"><div class="step-icon">4</div><span>Finalizing drivers</span></div>
+                    <div class="load-step" id="step-frames"><div class="step-icon">5</div><span>Computing math vectors</span></div>
+                </div>
+                <div style="margin-top:10px;font-family:'Roboto Mono', monospace; font-size:9px;color:var(--text-dim); letter-spacing: 1px;text-align:center;">This race will load instantly next time</div>
+            </div>
+
+            <div class="progress-bar-wrap" style="margin-top:16px;">
+                <div class="progress-bar-fill" id="prog-bar"></div>
+            </div>
+            <div id="loading-status" style="font-family: 'Roboto Mono', monospace; font-size:10px;color:var(--text-dim);margin-top:8px;text-align:center;letter-spacing:1px;"></div>
+            <div id="error-box2"></div>
+        </div>
+    </div>
+</div>
+
+<div id="main-container">
+    <div class="page-header">
+        <div class="page-header-left">
+            <div class="page-eyebrow">Time Machine Replay</div>
+            <div class="title-group">
+                <div id="race-title">Brown GP</div>
+                <div id="lap-counter">Lap --/--</div>
+            </div>
+        </div>
+        <a href="/" class="back-btn">Home</a>
+    </div>
+
+    <div class="section-header"><span class="section-label">Gap Tower</span><div class="section-line"></div></div>
+    <div class="worm-box" id="tower-container"><div id="spine"></div></div>
+
+    <div class="section-header"><span class="section-label">Driver Tracker</span><div class="section-line"></div></div>
+    <div class="map-box">
+        <canvas id="trackCanvas"></canvas>
+        <div id="joystick-zone"><div id="joystick-knob"></div></div>
+    </div>
+
+    <div class="section-header"><span class="section-label">Race Control</span><div class="section-line"></div></div>
+    <div class="rcm-box" id="rcm-board"></div>
+</div>
+
+<div id="playback-bar">
+    <button class="pb-btn" id="btn-play" onclick="togglePlay()">▶</button>
+    <span id="clock-display">00:00:00</span>
+    <input type="range" id="timeline" min="0" max="100" value="0" step="1">
+    <div class="speed-group">
+        <button class="speed-btn active" data-speed="1" onclick="setSpeed(1)">1×</button>
+        <button class="speed-btn" data-speed="4" onclick="setSpeed(4)">4×</button>
+        <button class="speed-btn" data-speed="10" onclick="setSpeed(10)">10×</button>
+    </div>
+</div>
+
+<script>
+const f1Calendar = {
+    "2026": ["Japan", "China", "Australia", "Saudi Arabia", "Bahrain"],
+    "2025": ["Abu Dhabi", "Qatar", "Las Vegas", "Brazil", "Mexico", "United States", "Singapore", "Azerbaijan", "Italy", "Netherlands", "Hungary", "Belgium", "Great Britain", "Austria", "Canada", "Spain", "Monaco", "Emilia Romagna", "Miami", "Saudi Arabia", "Bahrain", "Japan", "China", "Australia"],
+    "2024": ["Abu Dhabi", "Qatar", "Las Vegas", "Brazil", "Mexico", "United States", "Singapore", "Azerbaijan", "Italy", "Netherlands", "Belgium", "Hungary", "Great Britain", "Austria", "Spain", "Canada", "Monaco", "Emilia Romagna", "Miami", "China", "Japan", "Australia", "Saudi Arabia", "Bahrain"],
+    "2023": ["Abu Dhabi", "Las Vegas", "Brazil", "Mexico", "United States", "Qatar", "Japan", "Singapore", "Italy", "Netherlands", "Belgium", "Hungary", "Great Britain", "Austria", "Canada", "Spain", "Monaco", "Miami", "Azerbaijan", "Australia", "Saudi Arabia", "Bahrain"],
+    "2022": ["Abu Dhabi", "Brazil", "Mexico", "United States", "Japan", "Singapore", "Italy", "Netherlands", "Belgium", "Hungary", "France", "Austria", "Great Britain", "Canada", "Azerbaijan", "Monaco", "Spain", "Miami", "Emilia Romagna", "Australia", "Saudi Arabia", "Bahrain"],
+    "2021": ["Abu Dhabi", "Saudi Arabia", "Qatar", "Brazil", "Mexico", "United States", "Turkey", "Russia", "Italy", "Netherlands", "Belgium", "Hungary", "Great Britain", "Austria", "Styria", "France", "Azerbaijan", "Monaco", "Spain", "Portugal", "Emilia Romagna", "Bahrain"],
+    "2020": ["Austria", "Styria", "Hungary", "Great Britain", "70th Anniversary", "Spain", "Belgium", "Italy", "Tuscany", "Russia", "Eifel", "Portugal", "Emilia Romagna", "Turkey", "Bahrain", "Sakhir", "Abu Dhabi"],
+    "2019": ["Abu Dhabi", "Brazil", "United States", "Mexico", "Japan", "Russia", "Singapore", "Italy", "Belgium", "Hungary", "Germany", "Great Britain", "Austria", "France", "Canada", "Monaco", "Spain", "Azerbaijan", "China", "Bahrain", "Australia"],
+    "2018": ["Abu Dhabi", "Brazil", "Mexico", "United States", "Japan", "Russia", "Singapore", "Italy", "Belgium", "Hungary", "Germany", "Great Britain", "Austria", "France", "Canada", "Monaco", "Spain", "Azerbaijan", "China", "Bahrain", "Australia"]
+};
+
+function initDropdowns() {
+    const yearSelect = document.getElementById('year-select');
+    Object.keys(f1Calendar).sort((a,b) => b-a).forEach(year => {
+        let opt = document.createElement('option');
+        opt.value = year; opt.innerText = year;
+        yearSelect.appendChild(opt);
+    });
+    updateTracks();
+}
+
+function updateTracks() {
+    const year = document.getElementById('year-select').value;
+    const trackSelect = document.getElementById('track-select');
+    trackSelect.innerHTML = '';
+    f1Calendar[year].forEach(track => {
+        let opt = document.createElement('option');
+        opt.value = track; opt.innerText = track;
+        trackSelect.appendChild(opt);
+    });
+}
+
+window.addEventListener('DOMContentLoaded', initDropdowns);
+
+async function openCachePopup() {
+    document.getElementById('precomp-modal').classList.add('open');
+    document.getElementById('precomp-list').innerHTML = '<div style="text-align:center;color:var(--text-dim); font-size:12px;">Loading cache status...</div>';
+    try {
+        const res = await fetch('/api/cache-status');
+        const data = await res.json();
+        const list = document.getElementById('precomp-list');
+        if (Object.keys(data).length === 0) {
+            list.innerHTML = '<div style="color:var(--text-dim); font-size:12px;text-align:center;">No races precomputed yet.</div>';
+            return;
+        }
+        let html = '';
+        for (const [year, races] of Object.entries(data)) {
+            const cached = races.filter(r => r.status === 'cached');
+            html += `<div class="year-group"><div class="year-title">${year} - ${cached.length}/${races.length} cached</div>`;
+            races.forEach(r => {
+                const isCached = r.status === 'cached';
+                html += `<div class="popup-race-item ${isCached? 'cached': ''}" onclick="selectFromModal('${year}','${r.circuit}')">
+                            <div class="popup-dot ${isCached? 'cached': ''}"></div>
+                            <span>${r.circuit}</span>
+                            ${isCached? `<span style="margin-left:auto; font-family:'Roboto Mono', monospace; font-size:9px;color:var(--text-dim);">${r.size_mb} MB</span>` : ''}
+                         </div>`;
+            });
+            html += '</div>';
+        }
+        list.innerHTML = html;
+    } catch {
+        document.getElementById('precomp-list').innerHTML = '<div style="color:var(--red);font-size:12px;text-align:center;">Failed to load status.</div>';
+    }
+}
+
+function closeCachePopup() { document.getElementById('precomp-modal').classList.remove('open'); }
+function closePopupIfOutside(e) { if (e.target === document.getElementById('precomp-modal')) closeCachePopup(); }
+
+function selectFromModal(year, race) {
+    document.getElementById('year-select').value = year;
+    updateTracks();
+    document.getElementById('track-select').value = race;
+    closeCachePopup();
+}
+
+// --- ENGINE & STATE ---
+let meta = {};
+const canvas = document.getElementById('trackCanvas');
+const ctx = canvas.getContext('2d');
+let ws, framesBuffer = {}, requestedChunks = new Set(), rcmLog = [];
+let currentRaceTime = 0, minRaceTime = 0, maxRaceTime = 0, globalTotalLaps = 0;
+let isPlaying = false, playbackSpeed = 1;
+let lastFrameTime = performance.now(), animationId;
+
+// 3D Variables
+let trackX = [], trackY = [], trackZ = [];
+let cx = 0, cy = 0, cz = 0, minZ = 0, maxZ = 1;
+const CHUNK_SIZE = 60;
+
+// Camera State
+let rot = 0;
+let zoom = 1.1;
+let panX = 0, panY = 0;
+const tilt = 40 * Math.PI / 180; 
+
+function resizeCanvas() {
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = canvas.clientWidth * dpr;
+    canvas.height = canvas.clientHeight * dpr;
+    ctx.resetTransform();
+    ctx.scale(dpr, dpr);
+    renderScene();
+}
+window.addEventListener('resize', resizeCanvas);
+
+const LOAD_STEPS = ['step-connect', 'step-download', 'step-map', 'step-drivers', 'step-frames'];
+const STATUS_MAP = {
+    'Connecting': 'step-connect', 'Downloading': 'step-download', 'Extracting': 'step-map',
+    'Generating': 'step-drivers', 'Finalizing': 'step-drivers', 'Computing': 'step-frames', 'Pre-computing': 'step-frames'
+};
+const PROG_MAP = { 'step-connect': 10, 'step-download': 30, 'step-map': 55, 'step-drivers': 75, 'step-frames': 90 };
+
+function setLoadStep(statusMsg) {
+    document.getElementById('loading-status').innerText = statusMsg;
+    if (statusMsg.startsWith('Loading from cache')) {
+        document.getElementById('cache-load-panel').style.display = 'block';
+        document.getElementById('compute-load-panel').style.display = 'none';
+        document.getElementById('prog-bar').style.width = '60%';
+        return;
+    }
+    let matchedStep = null;
+    for (const [key, stepId] of Object.entries(STATUS_MAP)) {
+        if (statusMsg.startsWith(key)) { matchedStep = stepId; break; }
+    }
+    if (!matchedStep) return;
+    const idx = LOAD_STEPS.indexOf(matchedStep);
+    LOAD_STEPS.forEach((id, i) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (i < idx) { el.className = 'load-step done'; el.querySelector('.step-icon').innerText = '✓'; }
+        else if (i === idx) { el.className = 'load-step active'; }
+        else { el.className = 'load-step'; }
+    });
+    document.getElementById('prog-bar').style.width = PROG_MAP[matchedStep] + '%';
+}
+
+function smoothArray(arr, windowSize) {
+    let res = new Array(arr.length).fill(0);
+    for(let i=0; i<arr.length; i++) {
+        let sum = 0, count = 0;
+        for(let j=Math.max(0, i-windowSize); j<=Math.min(arr.length-1, i+windowSize); j++) {
+            sum += arr[j]; count++;
+        }
+        res[i] = sum/count;
+    }
+    return res;
+}
+
+function startStream() {
+    const year = document.getElementById('year-select').value;
+    const circuit = document.getElementById('track-select').value;
+    document.getElementById('race-title').innerText = `${year} ${circuit} Grand Prix`;
+    document.getElementById('lap-counter').innerText = 'Lap --/--';
+    document.getElementById('setup-panel').style.display = 'none';
+    document.getElementById('loading-panel').style.display = 'block';
+    document.getElementById('loading-title').innerText = `${year} ${circuit}`;
+    document.getElementById('loading-subtitle').innerText = 'Grand Prix Race';
+    document.getElementById('cache-load-panel').style.display = 'none';
+    document.getElementById('compute-load-panel').style.display = 'block';
+    setLoadStep('Connecting to backend...');
+
+    const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    ws = new WebSocket(`${protocol}//${location.host}/ws/replay`);
+    ws.onerror = () => {
+        document.getElementById('error-box2').style.display = 'block';
+        document.getElementById('error-box2').innerText = 'WebSocket connection failed.';
+    };
+    ws.onopen = () => {
+        setLoadStep('Connecting to backend...');
+        ws.send(JSON.stringify({ action: "init", year: parseInt(year), circuit }));
+    };
+    ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (data.type === 'status') {
+            setLoadStep(data.message);
+        } else if (data.type === 'error') {
+            document.getElementById('error-box2').style.display = 'block';
+            document.getElementById('error-box2').innerText = data.message;
+        } else if (data.type === 'init_data') {
+            
+            let smoothedX = smoothArray(data.track.x, 3);
+            let smoothedY = smoothArray(data.track.y, 3); 
+            let rawZ = data.track.z || new Array(smoothedX.length).fill(0);
+            let smoothedZ = smoothArray(rawZ, 12); 
+
+            trackX = smoothedX;
+            trackY = smoothedY;
+            trackZ = smoothedZ;
+            
+            cx = (Math.max(...trackX) + Math.min(...trackX)) / 2;
+            cy = (Math.max(...trackY) + Math.min(...trackY)) / 2;
+            cz = (Math.max(...trackZ) + Math.min(...trackZ)) / 2;
+            maxZ = Math.max(...trackZ); minZ = Math.min(...trackZ);
+
+            meta.trackEdges = [];
+            const TRACK_WIDTH = 120; 
+            for(let i=0; i<trackX.length; i++) {
+                // 🚨 FIX: Perfect Wrap-Around Math to seal the loop
+                let prev = (i - 1 + trackX.length) % trackX.length;
+                let next = (i + 1) % trackX.length;
+                
+                let dx = trackX[next] - trackX[prev];
+                let dy = trackY[next] - trackY[prev];
+                let len = Math.hypot(dx, dy) || 1;
+                let nx = -dy / len;
+                let ny = dx / len;
+                
+                meta.trackEdges.push({
+                    lx: trackX[i] + nx * TRACK_WIDTH, ly: trackY[i] + ny * TRACK_WIDTH,
+                    rx: trackX[i] - nx * TRACK_WIDTH, ry: trackY[i] - ny * TRACK_WIDTH,
+                    z: trackZ[i]
+                });
+            }
+            
+            resizeCanvas();
+            rcmLog = data.rcm;
+            globalTotalLaps = data.total_laps || 0;
+            minRaceTime = data.start_t0;
+            currentRaceTime = minRaceTime;
+            maxRaceTime = data.total_seconds;
+            document.getElementById('timeline').min = minRaceTime;
+            document.getElementById('timeline').max = maxRaceTime;
+            document.getElementById('timeline').value = minRaceTime;
+            requestChunk(Math.floor(minRaceTime / CHUNK_SIZE) * CHUNK_SIZE);
+        } else if (data.type === 'chunk_data') {
+            data.frames.forEach(frame => { if(frame && frame.t !== undefined) framesBuffer[frame.t] = frame; });
+            if (document.getElementById('overlay-screen').style.display !== 'none') {
+                document.getElementById('prog-bar').style.width = '100%';
+                setTimeout(() => {
+                    document.getElementById('overlay-screen').style.display = 'none';
+                    isPlaying = true;
+                    document.getElementById('btn-play').innerText = '⏸';
+                    lastFrameTime = performance.now();
+                    engineLoop();
+                }, 300);
+            } else if (!isPlaying) {
+                renderScene();
+            }
+        }
+    };
+}
+
+function requestChunk(startSec) {
+    if (requestedChunks.has(startSec) || startSec > maxRaceTime) return;
+    requestedChunks.add(startSec);
+    ws.send(JSON.stringify({ action: "get_chunk", start_sec: startSec, end_sec: startSec + CHUNK_SIZE }));
+}
+
+function engineLoop() {
+    const now = performance.now();
+    const deltaMs = now - lastFrameTime;
+    lastFrameTime = now;
+
+    if (isPlaying) {
+        currentRaceTime += (deltaMs / 1000) * playbackSpeed;
+        if (currentRaceTime >= maxRaceTime) {
+            currentRaceTime = maxRaceTime;
+            isPlaying = false;
+            document.getElementById('btn-play').innerText = '▶';
+        }
+        document.getElementById('timeline').value = currentRaceTime;
+        
+        let safeSec = Math.round(currentRaceTime * 4) / 4;
+        if (!framesBuffer[safeSec]) {
+            document.getElementById('clock-display').innerHTML = '<span class="buffer-badge">BUFFER</span>';
+        } else {
+            const nextChunk = Math.floor(currentRaceTime / CHUNK_SIZE) * CHUNK_SIZE + CHUNK_SIZE;
+            if (nextChunk - currentRaceTime < 30) requestChunk(nextChunk);
+        }
+    }
+    
+    renderScene();
+    animationId = requestAnimationFrame(engineLoop);
+}
+
+function togglePlay() {
+    isPlaying = !isPlaying;
+    document.getElementById('btn-play').innerText = isPlaying ? '⏸' : '▶';
+    if (isPlaying) lastFrameTime = performance.now();
+}
+
+function setSpeed(s) {
+    playbackSpeed = s;
+    document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector(`[data-speed="${s}"]`).classList.add('active');
+}
+
+document.getElementById('timeline').addEventListener('input', e => {
+    currentRaceTime = parseFloat(e.target.value);
+    requestChunk(Math.floor(currentRaceTime / CHUNK_SIZE) * CHUNK_SIZE);
+    if (!isPlaying) renderScene();
+});
+
+function formatTime(s) {
+    if (s < 0) return '00:00:00';
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const ss = Math.floor(s % 60);
+    return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(ss).padStart(2,'0')}`;
+}
+
+// --- JOYSTICK & PANNING LOGIC ---
+let isJoy = false, joyX = 0, joyY = 0;
+const joyBase = document.getElementById('joystick-zone');
+const joyKnob = document.getElementById('joystick-knob');
+let joyLoopId = null;
+
+joyBase.addEventListener('pointerdown', e => {
+    isJoy = true;
+    joyBase.setPointerCapture(e.pointerId);
+    joyKnob.style.transition = 'none'; 
+    updateJoy(e);
+    joyLoopId = requestAnimationFrame(applyJoyCamera);
+});
+joyBase.addEventListener('pointermove', e => { if (isJoy) updateJoy(e); });
+joyBase.addEventListener('pointerup', e => {
+    isJoy = false;
+    joyKnob.style.transition = 'transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)'; 
+    joyKnob.style.transform = `translate(0px, 0px)`;
+    joyX = 0; joyY = 0;
+    cancelAnimationFrame(joyLoopId);
+});
+
+function updateJoy(e) {
+    const rect = joyBase.getBoundingClientRect();
+    const cxJoy = rect.width / 2, cyJoy = rect.height / 2;
+    let dx = e.clientX - rect.left - cxJoy;
+    let dy = e.clientY - rect.top - cyJoy;
+    const dist = Math.min(Math.sqrt(dx*dx + dy*dy), cxJoy - 10);
+    const ang = Math.atan2(dy, dx);
+    joyX = Math.cos(ang) * dist;
+    joyY = Math.sin(ang) * dist;
+    joyKnob.style.transform = `translate(${joyX}px, ${joyY}px)`;
+}
+
+function applyJoyCamera() {
+    if (!isJoy) return;
+    const rect = joyBase.getBoundingClientRect();
+    rot += (joyX / (rect.width/2)) * 0.05;
+    let zoomDelta = (joyY / (rect.height/2)) * 0.05;
+    zoom -= zoom * zoomDelta; 
+    zoom = Math.max(0.1, Math.min(zoom, 100)); 
+    if (!isPlaying) renderScene();
+    joyLoopId = requestAnimationFrame(applyJoyCamera);
+}
+
+let isPan = false, lastPanX = 0, lastPanY = 0;
+canvas.addEventListener('pointerdown', e => {
+    isPan = true; lastPanX = e.clientX; lastPanY = e.clientY;
+    canvas.setPointerCapture(e.pointerId);
+});
+canvas.addEventListener('pointermove', e => {
+    if (isPan) {
+        panX += e.clientX - lastPanX;
+        panY += e.clientY - lastPanY;
+        lastPanX = e.clientX; lastPanY = e.clientY;
+        if (!isPlaying) renderScene();
+    }
+});
+canvas.addEventListener('pointerup', () => isPan = false);
+
+
+// --- 🚨 3D ENGINE RENDERING ---
+function renderScene() {
+    let safeSec = Math.round(currentRaceTime * 4) / 4;
+    const frame = framesBuffer[safeSec];
+    
+    document.getElementById('clock-display').innerText = formatTime(currentRaceTime - minRaceTime);
+
+    if (frame && globalTotalLaps > 0 && frame.tower.length > 0) {
+        const currentLap = Math.min(frame.tower[0].laps_comp + 1, globalTotalLaps);
+        const lapEl = document.getElementById('lap-counter');
+        if (lapEl) lapEl.innerText = `Lap ${currentLap}/${globalTotalLaps}`;
+    }
+
+    const cw = canvas.clientWidth, ch = canvas.clientHeight;
+    ctx.clearRect(0, 0, cw, ch);
+    
+    if (!meta.trackEdges || meta.trackEdges.length === 0) return;
+
+    let renderObjects = [];
+    let baseScale = (Math.min(cw, ch) / 12000) * zoom;
+    
+    const Z_EXAGGERATE = 12; 
+
+    function project3D(x, y, z) {
+        let dx = x - cx, dy = cy - y, dz = (z - cz) * Z_EXAGGERATE; 
+        let rx = dx * Math.cos(rot) - dy * Math.sin(rot);
+        let ry = dx * Math.sin(rot) + dy * Math.cos(rot);
+        let px = rx;
+        let py = ry * Math.cos(tilt) - dz * Math.sin(tilt);
+        px = (cw / 2) + (px * baseScale) + panX;
+        py = (ch / 2) + (py * baseScale) + panY;
+        let depth = ry * Math.sin(tilt) + dz * Math.cos(tilt);
+        return { x: px, y: py, d: depth };
+    }
+
+    function getAltitudeColor(z) {
+        let ratio = Math.max(0, Math.min(1, (z - minZ) / (maxZ - minZ || 1)));
+        let hue = (1 - ratio) * 240; 
+        return `hsl(${hue}, 100%, 50%)`;
+    }
+
+    // DRAW ISOMETRIC FLOOR GRID
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    let gridSize = 1500;
+    let floorZ = minZ - 30; 
+    let sX = Math.floor((cx - 10000) / gridSize) * gridSize;
+    let eX = Math.ceil((cx + 10000) / gridSize) * gridSize;
+    let sY = Math.floor((cy - 10000) / gridSize) * gridSize;
+    let eY = Math.ceil((cy + 10000) / gridSize) * gridSize;
+
+    for (let x = sX; x <= eX; x += gridSize) {
+        let p1 = project3D(x, sY, floorZ);
+        let p2 = project3D(x, eY, floorZ);
+        ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y);
+    }
+    for (let y = sY; y <= eY; y += gridSize) {
+        let p1 = project3D(sX, y, floorZ);
+        let p2 = project3D(eX, y, floorZ);
+        ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y);
+    }
+    ctx.stroke();
+
+    for (let i = 0; i < meta.trackEdges.length; i++) {
+        let nextIdx = (i + 1) % meta.trackEdges.length;
+        let e1 = meta.trackEdges[i], e2 = meta.trackEdges[nextIdx];
+        
+        let pl1 = project3D(e1.lx, e1.ly, e1.z);
+        let pr1 = project3D(e1.rx, e1.ry, e1.z);
+        let pl2 = project3D(e2.lx, e2.ly, e2.z);
+        let pr2 = project3D(e2.rx, e2.ry, e2.z);
+
+        renderObjects.push({
+            type: 'track', pl1, pr1, pl2, pr2,
+            depth: (pl1.d + pr1.d + pl2.d + pr2.d) / 4,
+            color: getAltitudeColor(e1.z)
+        });
+
+        if (i % 25 === 0) {
+            let pTopL = project3D(e1.lx, e1.ly, e1.z);
+            let pBotL = project3D(e1.lx, e1.ly, floorZ);
+            let pTopR = project3D(e1.rx, e1.ry, e1.z);
+            let pBotR = project3D(e1.rx, e1.ry, floorZ);
+            
+            renderObjects.push({ type: 'pillar', pTop: pTopL, pBot: pBotL, depth: pTopL.d + 0.1 });
+            renderObjects.push({ type: 'pillar', pTop: pTopR, pBot: pBotR, depth: pTopR.d + 0.1 });
+        }
+    }
+
+    // 🚨 FIX: THICK CHECKERED FINISH LINE
+    let finishEdge = meta.trackEdges[0];
+    let pFinishL = project3D(finishEdge.lx, finishEdge.ly, finishEdge.z);
+    let pFinishR = project3D(finishEdge.rx, finishEdge.ry, finishEdge.z);
+    renderObjects.push({
+        type: 'finish_line',
+        pL: pFinishL, pR: pFinishR,
+        depth: (pFinishL.d + pFinishR.d) / 2 - 1
+    });
+
+    if (frame && frame.telemetry) {
+        frame.telemetry.forEach(car => {
+            // 🚨 FIX: DYNAMIC Z-SNAPPING
+            let snappedZ = 0;
+            let minDist = Infinity;
+            for (let i = 0; i < trackX.length; i+=2) { 
+                let d = (car.x - trackX[i])**2 + (car.y - trackY[i])**2;
+                if (d < minDist) { minDist = d; snappedZ = trackZ[i]; }
+            }
+            
+            let p = project3D(car.x, car.y, snappedZ);
+            renderObjects.push({ type: 'car', p, color: car.color, name: car.name, depth: p.d - 10 });
+        });
+        renderGapTower(frame.tower);
+        renderRaceControl(safeSec);
+    }
+
+    // Painter's Algorithm 
+    renderObjects.sort((a, b) => b.depth - a.depth);
+
+    renderObjects.forEach(obj => {
+        if (obj.type === 'pillar') {
+            ctx.beginPath();
+            ctx.moveTo(obj.pTop.x, obj.pTop.y);
+            ctx.lineTo(obj.pBot.x, obj.pBot.y);
+            ctx.strokeStyle = 'rgba(255,255,255,0.08)'; 
+            ctx.lineWidth = Math.max(1, 1 * zoom);
+            ctx.stroke();
+            
+        } else if (obj.type === 'track') {
+            ctx.beginPath();
+            ctx.moveTo(obj.pl1.x, obj.pl1.y);
+            ctx.lineTo(obj.pr1.x, obj.pr1.y);
+            ctx.lineTo(obj.pr2.x, obj.pr2.y);
+            ctx.lineTo(obj.pl2.x, obj.pl2.y);
+            ctx.closePath();
+            ctx.fillStyle = '#161822';
+            ctx.fill();
+            
+            ctx.strokeStyle = '#161822';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(obj.pl1.x, obj.pl1.y); ctx.lineTo(obj.pl2.x, obj.pl2.y);
+            ctx.strokeStyle = obj.color; 
+            ctx.lineWidth = Math.max(1, 2 * zoom);
+            ctx.lineCap = 'round';
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(obj.pr1.x, obj.pr1.y); ctx.lineTo(obj.pr2.x, obj.pr2.y);
+            ctx.strokeStyle = obj.color; 
+            ctx.lineWidth = Math.max(1, 2 * zoom);
+            ctx.lineCap = 'round';
+            ctx.stroke();
+
+        } else if (obj.type === 'finish_line') {
+            // Draw Checkered Line Base
+            ctx.beginPath();
+            ctx.moveTo(obj.pL.x, obj.pL.y);
+            ctx.lineTo(obj.pR.x, obj.pR.y);
+            ctx.lineWidth = Math.max(4, 6 * zoom);
+            ctx.strokeStyle = '#ffffff';
+            ctx.stroke();
+            
+            // Draw Checkered Dashes
+            ctx.beginPath();
+            ctx.moveTo(obj.pL.x, obj.pL.y);
+            ctx.lineTo(obj.pR.x, obj.pR.y);
+            ctx.lineWidth = Math.max(4, 6 * zoom);
+            ctx.strokeStyle = '#000000';
+            ctx.setLineDash([Math.max(4, 6 * zoom), Math.max(4, 6 * zoom)]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+        } else if (obj.type === 'car') {
+            let dynRadius = Math.max(3, 6 * zoom);
+            let dynFont = Math.max(8, 10 * zoom);
+            let dynShadowOffset = 4 * Math.max(0.5, zoom);
+
+            ctx.beginPath();
+            ctx.arc(obj.p.x, obj.p.y + dynShadowOffset, dynRadius, 0, Math.PI*2);
+            ctx.fillStyle = 'rgba(0,0,0,0.5)';
+            ctx.fill();
+            
+            ctx.beginPath();
+            ctx.arc(obj.p.x, obj.p.y, dynRadius, 0, Math.PI*2);
+            ctx.fillStyle = obj.color;
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = Math.max(1, 1.5 * zoom);
+            ctx.stroke();
+            
+            ctx.fillStyle = '#fff';
+            ctx.font = `bold ${dynFont}px "Roboto Mono"`;
+            ctx.shadowColor = '#000'; ctx.shadowBlur = Math.max(2, 4 * zoom);
+            ctx.fillText(obj.name, obj.p.x + dynRadius + 2, obj.p.y + (dynRadius / 2));
+            ctx.shadowBlur = 0;
+        }
+    });
+}
+
+function renderGapTower(towerData) {
+    const container = document.getElementById('tower-container');
+    container.innerHTML = '<div id="spine"></div>';
+    const PPS = 22, MIN_SPACE = 30;
+    let lastY = -999;
+
+    towerData.forEach(drv => {
+        const idealY = drv.gap_secs * PPS;
+        const actualY = Math.max(idealY, lastY + MIN_SPACE);
+        lastY = actualY;
+        const isLeft = (drv.pos % 2 === 0);
+        
+        const row = document.createElement('div');
+        row.className = `worm-row ${isLeft ? 'left-align' : 'right-align'}`;
+        row.style.top = `${actualY + 16}px`;
+        
+        const textHTML = `
+            <div class="worm-text">
+                <div class="worm-pos">P${drv.pos}</div>
+                <div class="worm-name">${drv.name}</div>
+                <div class="worm-gap">${drv.gap_str}</div>
+            </div>`;
+        const carHTML = `<div class="worm-car" style="background:${drv.color};box-shadow:0 0 8px ${drv.color}66;"></div>`;
+        const ph = '<div class="worm-text-placeholder"></div>';
+        
+        row.innerHTML = isLeft ? textHTML + carHTML + ph : ph + carHTML + textHTML;
+        container.appendChild(row);
+    });
+
+    if (towerData.length > 0) {
+        document.getElementById('spine').style.height = `${lastY + 60}px`;
+    }
+}
+
+function renderRaceControl(safeSec) {
+    const board = document.getElementById('rcm-board');
+    const visible = rcmLog.filter(m => m.frame <= safeSec).reverse();
+    if (!visible.length) return;
+    board.innerHTML = '';
+    visible.forEach(msg => {
+        const div = document.createElement('div');
+        div.className = 'rcm-msg';
+        const msgText = msg.msg;
+        let cls = '';
+        if (msgText.includes('YELLOW') || msgText.includes('VSC')) cls = 'rcm-flag-yellow';
+        else if (msgText.includes('RED FLAG') || msgText.includes('RETIRE')) cls = 'rcm-flag-red';
+        else if (msgText.includes('GREEN') || msgText.includes('CLEAR')) cls = 'rcm-flag-green';
+        
+        div.innerHTML = `<span class="rcm-time">${formatTime(msg.frame - minRaceTime)}</span> <span class="${cls}">${msgText}</span>`;
+        board.appendChild(div);
+    });
+}
+</script>
+</body>
+</html>
