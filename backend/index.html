@@ -23,7 +23,6 @@ body { background: var(--bg); color: var(--text); font-family: 'Titillium Web', 
     z-index: 90; position: relative; margin-top: 3px;
 }
 
-/* HEADER */
 .page-header { position: sticky; top: 3px; background: var(--surface2); border-bottom: 1px solid var(--border2); padding: 14px 16px 12px; z-index: 50; }
 .header-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .session-eyebrow { font-family: 'Roboto Mono', monospace; font-size: 9px; letter-spacing: 3px; color: var(--red); text-transform: uppercase; margin-bottom: 3px; }
@@ -41,19 +40,15 @@ body { background: var(--bg); color: var(--text); font-family: 'Titillium Web', 
 #session-clock { font-family: 'Roboto Mono', monospace; font-size: 20px; font-weight: 700; color: var(--text); letter-spacing: 2px; }
 
 .recap-announcement {
-    font-size: 24px !important;
-    font-family: 'Titillium Web', sans-serif !important;
-    font-weight: 900 !important;
-    color: var(--yellow) !important;
-    letter-spacing: 0 !important;
-    text-transform: uppercase !important;
+    font-size: 24px !important; font-family: 'Titillium Web', sans-serif !important;
+    font-weight: 900 !important; color: var(--yellow) !important;
+    letter-spacing: 0 !important; text-transform: uppercase !important;
 }
 
-/* STANDARD TABLE (Live & Mid-Weekend) */
 .timing-wrap { padding: 12px 0 20px; }
 .col-headers {
-    display: grid; gap: 0; padding: 8px 6px;
-    border-bottom: 2px solid var(--red); position: sticky; top: calc(3px + 88px); background: var(--surface2); z-index: 40;
+    display: grid; gap: 0; padding: 8px 6px; border-bottom: 2px solid var(--red);
+    position: sticky; top: calc(3px + 88px); background: var(--surface2); z-index: 40;
 }
 .col-h { font-family: 'Roboto Mono', monospace; font-size: 9px; letter-spacing: 1.5px; color: var(--text-dim); text-transform: uppercase; }
 
@@ -68,13 +63,12 @@ body { background: var(--bg); color: var(--text); font-family: 'Titillium Web', 
 .grid-delta.even { color: var(--text-dim); }
 
 .team-bar { width: 3px; height: 26px; border-radius: 1px; flex-shrink: 0; }
-.drv-cell { font-size: 15px; font-weight: 700; letter-spacing: 0.5px; }
+.drv-cell { font-size: 15px; font-weight: 700; letter-spacing: 0.5px; display: flex; align-items: center; }
 
 .tyre-cell { display: flex; align-items: center; justify-content: center; }
 .tyre-dot { width: 20px; height: 20px; border-radius: 50%; border: 2px solid currentColor; display: flex; align-items: center; justify-content: center; font-family: 'Roboto Mono', monospace; font-size: 9px; font-weight: 700; }
 .tyre-age { font-family: 'Roboto Mono', monospace; font-size: 10px; color: var(--text-dim); margin-left: 4px;}
 
-/* PILL UI ELEMENTS */
 .time-pill {
     background: var(--surface3); border: 1px solid var(--border); border-radius: 4px;
     padding: 3px 4px; display: inline-block; text-align: center; min-width: 60px;
@@ -98,7 +92,12 @@ body { background: var(--bg); color: var(--text); font-family: 'Titillium Web', 
 .gap-cell { font-family: 'Roboto Mono', monospace; font-size: 10px; color: var(--text-mid); }
 .stops-cell { font-family: 'Roboto Mono', monospace; font-size: 12px; font-weight: 700; color: var(--text-dim); text-align: center; }
 
-/* EXPANDED DETAILS */
+.badge-dsq {
+    background: rgba(225,6,0,0.15); color: var(--red); border: 1px solid rgba(225,6,0,0.3);
+    font-family: 'Roboto Mono', monospace; font-size: 9px; padding: 1px 4px; border-radius: 2px;
+    margin-left: 6px; font-weight: 700;
+}
+
 .driver-details { display: none; padding: 12px 12px 16px 12px; background: var(--surface3); border-bottom: 1px solid var(--border); }
 .driver-details.open { display: block; }
 .detail-seg { display: flex; flex-direction: column; gap: 2px; }
@@ -107,28 +106,27 @@ body { background: var(--bg); color: var(--text); font-family: 'Titillium Web', 
 
 .quali-history-wrap { display: flex; justify-content: space-around; width: 100%; max-width: 350px; margin: 4px auto 0; padding-top: 12px; border-top: 1px solid var(--border); }
 .quali-history-seg { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-
-.tyre-timeline { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+.tyre-timeline { display: flex; align-items: center; gap: 8px; margin-top: 4px; flex-wrap: wrap; }
 .stint-laps { font-family: 'Roboto Mono', monospace; font-size: 10px; color: var(--text-mid); }
 .stint-line { width: 20px; height: 2px; background: var(--border2); }
+.tap-hint { font-family:'Roboto Mono',monospace;font-size:9px;color:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:flex-end;padding-right:10px; }
 
-/* OFF-WEEK DASHBOARD */
-#dashboard-wrap { display: none; padding: 16px; gap: 16px; max-width: 1200px; margin: 0 auto; }
-@media(min-width: 900px) { #dashboard-wrap { display: grid; grid-template-columns: 1fr 400px; } }
+#dashboard-wrap { display: none; padding: 16px; gap: 16px; max-width: 1200px; margin: 0 auto; align-items: start; }
+@media(min-width: 900px) { #dashboard-wrap { display: grid; grid-template-columns: 1fr 1fr; } }
+@media(min-width: 1100px) { #dashboard-wrap { grid-template-columns: 1fr 450px; } }
 
 .dash-card { background: var(--surface2); border: 1px solid var(--border2); border-radius: 4px; overflow: hidden; margin-bottom: 16px; }
 .dash-card-header { padding: 12px 16px; border-bottom: 2px solid var(--red); background: var(--surface3); }
 .dash-card-title { font-family: 'Roboto Mono', monospace; font-size: 10px; letter-spacing: 2px; color: var(--red); text-transform: uppercase; }
 .dash-card-subtitle { font-size: 16px; font-weight: 700; margin-top: 2px; }
 
-.mini-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
+.mini-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 16px; }
 .mini-card { background: var(--surface2); border: 1px solid var(--border2); border-radius: 4px; padding: 12px; }
 .mini-card-title { font-family: 'Roboto Mono', monospace; font-size: 9px; color: var(--text-dim); letter-spacing: 1px; margin-bottom: 8px; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
 .mini-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; font-size: 12px; }
 .mini-drv { font-weight: 700; display: flex; align-items: center; gap: 6px; }
 .mini-time { font-family: 'Roboto Mono', monospace; font-size: 10px; color: var(--text-mid); }
 
-/* STATUS BAR & OVERLAY */
 #status-bar { position: fixed; bottom: 0; background: var(--surface2); left: 0; right: 0; border-top: 1px solid var(--border2); padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; z-index: 1000; }
 .status-left { display: flex; align-items: center; gap: 12px; }
 .status-dot-wrap { display: flex; align-items: center; gap: 5px; font-family: 'Roboto Mono', monospace; font-size: 10px; color: var(--text-dim); }
@@ -142,6 +140,7 @@ body { background: var(--bg); color: var(--text); font-family: 'Titillium Web', 
 @keyframes spin { to { transform: rotate(360deg); } }
 .conn-text { font-family: 'Roboto Mono', monospace; font-size: 11px; letter-spacing: 2px; color: var(--text-dim); text-transform: uppercase; }
 
+.elimination-banner { text-align:center; background: rgba(225,6,0,0.15); color: var(--red); font-family: 'Roboto Mono', monospace; font-size: 10px; padding: 4px 0; border-top: 1px solid rgba(225,6,0,0.3); border-bottom: 1px solid rgba(225,6,0,0.3); letter-spacing: 2px; }
 </style>
 </head>
 <body>
@@ -174,8 +173,8 @@ body { background: var(--bg); color: var(--text); font-family: 'Titillium Web', 
 </div>
 
 <div id="dashboard-wrap">
-    <div class="dash-left">
-        <div class="dash-card">
+    <div class="dash-left" id="dash-left-col">
+        <div class="dash-card" id="race-card-container">
             <div class="dash-card-header">
                 <div class="dash-card-title">Final Classification</div>
                 <div class="dash-card-subtitle">Race Results</div>
@@ -185,18 +184,40 @@ body { background: var(--bg); color: var(--text); font-family: 'Titillium Web', 
             </div>
             <div id="dash-race-table"></div>
         </div>
+        
+        <div class="dash-card" id="sprint-card-container" style="display:none;">
+            <div class="dash-card-header">
+                <div class="dash-card-title">Sprint Classification</div>
+                <div class="dash-card-subtitle">Sprint Race</div>
+            </div>
+            <div class="col-headers" style="position:static; grid-template-columns: 45px 36px 80px 1fr 70px 60px;">
+                <div class="col-h">Pos</div><div class="col-h"></div><div class="col-h">Driver</div><div class="col-h"></div><div class="col-h">Gap</div><div class="col-h">Pits</div>
+            </div>
+            <div id="dash-sprint-table"></div>
+        </div>
     </div>
     
-    <div class="dash-right">
+    <div class="dash-right" id="dash-right-col">
         <div class="mini-grid" id="fp-cards"></div>
         
-        <div class="dash-card">
+        <div class="dash-card" id="sq-card-container" style="display:none;">
+            <div class="dash-card-header">
+                <div class="dash-card-title">Sprint Grid</div>
+                <div class="dash-card-subtitle">Sprint Shootout</div>
+            </div>
+            <div class="col-headers" style="position:static; grid-template-columns: 35px 30px 60px 1fr 60px 60px 60px;">
+                <div class="col-h">P</div><div class="col-h"></div><div class="col-h">Driver</div><div class="col-h" style="text-align:right;padding-right:10px;">Gap</div><div class="col-h">SQ1</div><div class="col-h">SQ2</div><div class="col-h">SQ3</div>
+            </div>
+            <div id="dash-sprint-quali-table"></div>
+        </div>
+
+        <div class="dash-card" id="quali-card-container">
             <div class="dash-card-header">
                 <div class="dash-card-title">Starting Grid</div>
                 <div class="dash-card-subtitle">Qualifying</div>
             </div>
-            <div class="col-headers" style="position:static; grid-template-columns: 35px 30px 1fr 60px 60px 60px;">
-                <div class="col-h">P</div><div class="col-h"></div><div class="col-h">Driver</div><div class="col-h">Q1</div><div class="col-h">Q2</div><div class="col-h">Q3</div>
+            <div class="col-headers" style="position:static; grid-template-columns: 35px 30px 60px 1fr 60px 60px 60px;">
+                <div class="col-h">P</div><div class="col-h"></div><div class="col-h">Driver</div><div class="col-h" style="text-align:right;padding-right:10px;">Gap</div><div class="col-h">Q1</div><div class="col-h">Q2</div><div class="col-h">Q3</div>
             </div>
             <div id="dash-quali-table"></div>
         </div>
@@ -214,7 +235,6 @@ body { background: var(--bg); color: var(--text); font-family: 'Titillium Web', 
 let LIVE_DATA = { SessionInfo: {}, TimingData: {}, TimingAppData: {}, DriverList: {} };
 let expandedDrivers = new Set();
 let ws;
-
 const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
 
 function connectWS() {
@@ -268,6 +288,12 @@ function getTyreColor(compound) {
     return compound === 'H' ? '#ffffff' : compound === 'M' ? '#ffe600' : compound === 'S' ? '#ff2a2a' : compound === 'I' ? '#00e640' : compound === 'W' ? '#0088ff' : '#888';
 }
 
+function timeToSecs(tStr) {
+    if (!tStr || tStr === '-' || !tStr.includes(':')) return Infinity;
+    let parts = tStr.split(':');
+    return parseInt(parts[0]) * 60 + parseFloat(parts[1]);
+}
+
 function render() {
     const si = LIVE_DATA.SessionInfo;
     if (!si || Object.keys(si).length === 0) {
@@ -277,13 +303,12 @@ function render() {
     }
 
     if (si.RecapData && si.RecapData.is_recap) {
-        // RECAP MODE
         document.getElementById('offline-banner').style.display = 'block';
         document.getElementById('live-badge-ui').style.display = 'none';
         document.getElementById('header-eyebrow').innerText = 'PREVIOUSLY ON FORMULA 1';
         document.getElementById('header-eyebrow').classList.add('recap-announcement');
         document.getElementById('session-name').innerText = `${si.RecapData.event_name} - ${si.RecapData.last_session}`;
-        document.getElementById('session-clock').innerText = 'Archive';
+        document.getElementById('session-clock').innerText = ''; // Clear Archive text for mobile UX
 
         if (si.RecapData.recap_mode === 'off_week') {
             document.getElementById('standard-wrap').style.display = 'none';
@@ -295,7 +320,6 @@ function render() {
             renderMidWeekendTable(si.RecapData);
         }
     } else {
-        // LIVE MODE
         document.getElementById('offline-banner').style.display = 'none';
         document.getElementById('live-badge-ui').style.display = 'flex';
         document.getElementById('header-eyebrow').innerText = 'Live Session';
@@ -313,9 +337,7 @@ function renderLiveTable() {
     const td = LIVE_DATA.TimingData; const tad = LIVE_DATA.TimingAppData; const dl = LIVE_DATA.DriverList;
     if (!td || !td.Lines) return;
     
-    // SURGICAL FIX: 9-Column Wide Layout for Live Timing
     const liveGridTemplate = "25px 10px 45px 32px 70px 45px 1fr 1fr 1fr";
-    
     const stdHeaders = document.getElementById('std-headers');
     stdHeaders.style.gridTemplateColumns = liveGridTemplate;
     stdHeaders.innerHTML = `
@@ -326,12 +348,25 @@ function renderLiveTable() {
 
     const drivers = Object.entries(td.Lines).map(([num, data]) => ({ num, data, driverInfo: dl[num] || {} })).sort((a, b) => (parseInt(a.data.Position) || 99) - (parseInt(b.data.Position) || 99));
     const table = document.getElementById('timing-table');
-    const isQual = (LIVE_DATA.SessionInfo?.Name || '').toLowerCase().includes('qual');
-    const qPrefix = (LIVE_DATA.SessionInfo?.Name || '').toLowerCase().includes('sprint') ? 'SQ' : 'Q';
+    const sessName = (LIVE_DATA.SessionInfo?.Name || '').toLowerCase();
+    const isQual = sessName.includes('qual') || sessName.includes('sq') || sessName.includes('shootout');
+    const qPrefix = sessName.includes('sprint') || sessName.includes('sq') ? 'SQ' : 'Q';
 
     table.innerHTML = '';
+    
+    let fastestLiveSecs = Infinity;
+    if (isQual) {
+        drivers.forEach(drv => {
+            const best = drv.data.BestLapTime?.Value;
+            if (best && best !== '-') fastestLiveSecs = Math.min(fastestLiveSecs, timeToSecs(best));
+        });
+    }
 
     drivers.forEach((drv, idx) => {
+        if (isQual && (idx === 10 || idx === 15)) {
+            table.innerHTML += `<div class="elimination-banner">▼ ${qPrefix}${idx === 10 ? '2' : '1'} DROP ZONE ▼</div>`;
+        }
+
         const pos = drv.data.Position || (idx + 1);
         const name = drv.driverInfo.Tla || drv.driverInfo.Abbreviation || drv.num;
         const tc = '#' + (drv.driverInfo.TeamColour || 'ffffff').replace('#','');
@@ -343,30 +378,29 @@ function renderLiveTable() {
             if (stints.length > 0) {
                 const last = stints[stints.length - 1];
                 compound = (last.Compound || '?')[0]; 
-                // Only show tyre age if it has laps on it
-                if(last.TotalLaps > 0) { tyreAge = `<span class="tyre-age">${last.TotalLaps}</span>`; }
+                if(last.TotalLaps > 0) tyreAge = `<span class="tyre-age">${last.TotalLaps}</span>`;
             }
         }
         
-        // 1. BEST LAP TIME & COLORING PILL
         const bestLapObj = drv.data.BestLapTime;
         const bestLap = bestLapObj?.Value || drv.data.LastLapTime?.Value || '-';
         const lapClass = bestLapObj?.OverallFastest ? 'purple' : bestLapObj?.PersonalFastest ? 'green' : (bestLap !== '-' ? 'yellow' : 'white');
         
-        // 2. GAP TO LEADER (Handling Quali specifically!)
         let gap = '-';
-        if (pos == 1) {
-            gap = 'Leader';
+        if (isQual) {
+            const best = drv.data.BestLapTime?.Value;
+            if (best && best !== '-') {
+                let mySecs = timeToSecs(best);
+                if (mySecs === fastestLiveSecs) gap = 'Leader';
+                else gap = '+' + (mySecs - fastestLiveSecs).toFixed(3) + 's';
+            }
         } else {
-            gap = drv.data.TimeDiffToFastest || drv.data.GapToLeader || drv.data.TimeDiffToPositionAhead || '-';
+            if (pos == 1) gap = 'Leader';
+            else gap = drv.data.TimeDiffToFastest || drv.data.GapToLeader || drv.data.TimeDiffToPositionAhead || '-';
         }
 
         const isExpanded = expandedDrivers.has(drv.num);
-        
-        // 3. LIVE SECTORS (S1, S2, S3) FOR MAIN ROW
-        let s1_val = '', s1_class = 'empty';
-        let s2_val = '', s2_class = 'empty';
-        let s3_val = '', s3_class = 'empty';
+        let s1_val = '', s1_class = 'empty', s2_val = '', s2_class = 'empty', s3_val = '', s3_class = 'empty';
         
         [0, 1, 2].forEach(i => {
             let sInfo = drv.data.Sectors?.[i] || drv.data.Sectors?.[i.toString()];
@@ -377,16 +411,12 @@ function renderLiveTable() {
             if (i===2) { s3_val = val; s3_class = sClass; }
         });
 
-        // 4. EXPANDED VIEW: Quali Centered History OR Race Pit Stops
         let detailHtml = '';
         if (isQual) {
             let qHtml = [0, 1, 2].map(i => {
                 let val = '';
-                if (Array.isArray(drv.data.BestLapTimes)) {
-                    val = drv.data.BestLapTimes[i]?.Value || '';
-                } else if (drv.data.BestLapTimes && typeof drv.data.BestLapTimes === 'object') {
-                    val = drv.data.BestLapTimes[i]?.Value || drv.data.BestLapTimes[i.toString()]?.Value || '';
-                }
+                if (Array.isArray(drv.data.BestLapTimes)) val = drv.data.BestLapTimes[i]?.Value || '';
+                else if (drv.data.BestLapTimes && typeof drv.data.BestLapTimes === 'object') val = drv.data.BestLapTimes[i]?.Value || drv.data.BestLapTimes[i.toString()]?.Value || '';
                 return `<div class="quali-history-seg"><div class="detail-seg-label">${qPrefix}${i+1}</div><div class="detail-seg-time white">${val || '-'}</div></div>`;
             }).join('');
             detailHtml = `<div class="quali-history-wrap">${qHtml}</div>`;
@@ -454,13 +484,14 @@ function renderMidWeekendTable(recap) {
         }
         
         const timeVal = recap.session_type === 'Race' ? drv.gap : (drv.q3 || drv.q2 || drv.q1 || drv.time || '-');
-        
+        const driverNameUI = drv.driver + (drv.is_dsq ? '<span class="badge-dsq">DSQ</span>' : '');
+
         table.innerHTML += `
             <div class="driver-block" id="drv-${drv.driver}">
                 <div class="driver-row ${isExpanded ? 'expanded' : ''}" style="grid-template-columns: 45px 36px 80px 1fr 70px 60px;" onclick="toggleDriver('${drv.driver}')">
                     <div class="pos-cell">${gridArrow}<span class="pos-num">${drv.pos === 99 ? 'NC' : drv.pos}</span></div>
                     <div style="display:flex;align-items:center;"><div class="team-bar" style="background:${drv.color};"></div></div>
-                    <div class="drv-cell">${drv.driver}</div>
+                    <div class="drv-cell">${driverNameUI}</div>
                     <div class="tyre-cell"></div>
                     <div class="time-cell ${drv.fastest ? 'purple' : 'white'}">${timeVal}</div>
                     <div class="stops-cell">${drv.stops !== undefined ? drv.stops : '-'}</div>
@@ -470,13 +501,11 @@ function renderMidWeekendTable(recap) {
     });
 }
 
-function renderOffWeekDashboard(recap) {
-    // 1. Render Race Table
-    const rt = document.getElementById('dash-race-table');
-    rt.innerHTML = '';
-    recap.race.forEach(drv => {
+function renderRaceTable(container, data) {
+    container.innerHTML = '';
+    data.forEach(drv => {
         const isExpanded = expandedDrivers.has(drv.driver);
-        let detailHtml = `<div class="detail-seg"><div class="detail-seg-label">Strategy</div><div class="tyre-timeline">`;
+        let detailHtml = `<div class="detail-seg" style="padding-left:12px;"><div class="detail-seg-label">Strategy</div><div class="tyre-timeline">`;
         if (drv.stints) {
             drv.stints.forEach((s, i) => {
                 detailHtml += `<div class="tyre-dot" style="color:${getTyreColor(s.tyre)}; border-color:${getTyreColor(s.tyre)};">${s.tyre}</div>`;
@@ -493,38 +522,82 @@ function renderOffWeekDashboard(recap) {
             if (diff < 0) gridArrow = `<div class="grid-delta down">▼${Math.abs(diff)}</div>`;
         }
 
-        rt.innerHTML += `
+        const driverNameUI = drv.driver + (drv.is_dsq ? '<span class="badge-dsq">DSQ</span>' : '');
+
+        container.innerHTML += `
             <div class="driver-block">
                 <div class="driver-row ${isExpanded ? 'expanded' : ''}" style="grid-template-columns: 45px 36px 80px 1fr 70px 60px;" onclick="toggleDriver('${drv.driver}')">
                     <div class="pos-cell">${gridArrow}<span class="pos-num">${drv.pos === 99 ? 'NC' : drv.pos}</span></div>
                     <div style="display:flex;align-items:center;"><div class="team-bar" style="background:${drv.color};"></div></div>
-                    <div class="drv-cell">${drv.driver}</div>
-                    <div class="tyre-cell"></div>
+                    <div class="drv-cell">${driverNameUI}</div>
+                    <div class="tap-hint">TAP FOR STRATEGY ▻</div>
                     <div class="time-cell ${drv.fastest ? 'purple' : 'white'}">${drv.gap}</div>
                     <div class="stops-cell">${drv.stops}</div>
                 </div>
                 <div class="driver-details ${isExpanded ? 'open' : ''}" id="detail-${drv.driver}">${detailHtml}</div>
             </div>`;
     });
+}
 
-    // 2. Render Quali Table
-    const qt = document.getElementById('dash-quali-table');
-    qt.innerHTML = '';
-    recap.quali.forEach(drv => {
-        qt.innerHTML += `
+function renderQualiTable(container, data, titlePrefix) {
+    container.innerHTML = '';
+    let bestQ1 = Infinity, bestQ2 = Infinity, bestQ3 = Infinity;
+    data.forEach(d => {
+        bestQ1 = Math.min(bestQ1, timeToSecs(d.q1));
+        bestQ2 = Math.min(bestQ2, timeToSecs(d.q2));
+        bestQ3 = Math.min(bestQ3, timeToSecs(d.q3));
+    });
+
+    data.forEach((drv, idx) => {
+        if (idx === 10 || idx === 15) {
+            container.innerHTML += `<div class="elimination-banner">▼ ${titlePrefix}${idx === 10 ? '2' : '1'} DROP ZONE ▼</div>`;
+        }
+
+        let gapStr = '-';
+        let qTime = drv.q3 ? drv.q3 : (drv.q2 ? drv.q2 : drv.q1);
+        let bestTime = drv.q3 ? bestQ3 : (drv.q2 ? bestQ2 : bestQ1);
+        let mySecs = timeToSecs(qTime);
+        
+        if (drv.is_dsq) {
+            gapStr = '<span style="color:var(--red); font-weight:bold;">DSQ</span>';
+        } else if (mySecs !== Infinity && bestTime !== Infinity && mySecs > bestTime) {
+            gapStr = '+' + (mySecs - bestTime).toFixed(3) + 's';
+        } else if (mySecs === bestTime && mySecs !== Infinity) {
+            gapStr = 'Leader';
+        }
+
+        const driverNameUI = drv.driver + (drv.is_dsq ? '<span class="badge-dsq">DSQ</span>' : '');
+
+        container.innerHTML += `
             <div class="driver-block">
-                <div class="driver-row" style="grid-template-columns: 35px 30px 1fr 60px 60px 60px; cursor:default;">
-                    <div class="pos-cell"><span class="pos-num">${drv.pos}</span></div>
+                <div class="driver-row" style="grid-template-columns: 35px 30px 60px 1fr 60px 60px 60px; cursor:default;">
+                    <div class="pos-cell"><span class="pos-num">${drv.pos === 99 ? 'NC' : drv.pos}</span></div>
                     <div style="display:flex;align-items:center;"><div class="team-bar" style="background:${drv.color};"></div></div>
-                    <div class="drv-cell">${drv.driver}</div>
+                    <div class="drv-cell">${driverNameUI}</div>
+                    <div class="gap-cell" style="text-align:right; padding-right:10px;">${gapStr}</div>
                     <div class="gap-cell" style="color:var(--text-mid);">${drv.q1 || '-'}</div>
                     <div class="gap-cell" style="color:var(--text);">${drv.q2 || '-'}</div>
                     <div class="gap-cell" style="color:var(--yellow); font-weight:700;">${drv.q3 || '-'}</div>
                 </div>
             </div>`;
     });
+}
 
-    // 3. Render FP Cards
+function renderOffWeekDashboard(recap) {
+    if (recap.race) renderRaceTable(document.getElementById('dash-race-table'), recap.race);
+    
+    if (recap.sprint) {
+        document.getElementById('sprint-card-container').style.display = 'block';
+        renderRaceTable(document.getElementById('dash-sprint-table'), recap.sprint);
+    }
+    
+    if (recap.quali) renderQualiTable(document.getElementById('dash-quali-table'), recap.quali, 'Q');
+    
+    if (recap.sprint_quali) {
+        document.getElementById('sq-card-container').style.display = 'block';
+        renderQualiTable(document.getElementById('dash-sprint-quali-table'), recap.sprint_quali, 'SQ');
+    }
+
     const fc = document.getElementById('fp-cards');
     fc.innerHTML = '';
     ['fp1', 'fp2', 'fp3'].forEach(fp => {
@@ -550,7 +623,7 @@ function toggleDriver(num) {
 
 setInterval(() => {
     const el = document.getElementById('session-clock');
-    if (el && el.innerText !== '--:--' && el.innerText !== 'Archive' && !el.innerText.includes(':')) return;
+    if (el && el.innerText !== '--:--' && el.innerText !== '' && !el.innerText.includes(':')) return;
 }, 1000);
 
 fetchInitial();
