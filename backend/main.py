@@ -11,6 +11,7 @@ import time
 import aiohttp
 import zlib
 import base64
+import warnings
 from urllib.parse import quote
 from fastapi import FastAPI, WebSocket
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -19,8 +20,12 @@ from fastapi.staticfiles import StaticFiles
 import uvicorn
 import datetime
 
+# Suppress FastF1 deprecation warnings to keep logs clean
+warnings.simplefilter(action='ignore', category=FutureWarning)
+
 app = FastAPI()
 
+# Mount the F1_Frames directory for the landing page
 app.mount("/F1_Frames", StaticFiles(directory="F1_Frames"), name="frames")
 
 app.add_middleware(
@@ -385,7 +390,7 @@ async def background_precompute():
         if races_done_today < RACES_PER_DAY: await asyncio.sleep(PRECOMPUTE_INTERVAL_HOURS * 3600)
 
 def _fmt_time(td):
-    if pd.isna(td): return ""
+    if pd.isna(td): return "-"
     return f"{int(td.total_seconds()//60)}:{td.total_seconds()%60:06.3f}"
 
 def _extract_race(year, event, session_name='Race'):
@@ -396,7 +401,7 @@ def _extract_race(year, event, session_name='Race'):
         fastest_driver = None
         try: fastest_driver = s.laps.pick_fastest()['DriverNumber']
         except: pass
-        for _, row in s.results.iterrows():
+        for index, (_, row) in enumerate(s.results.iterrows()):
             drv = row['DriverNumber']
             stints, stops = [], 0
             try:
@@ -409,11 +414,11 @@ def _extract_race(year, event, session_name='Race'):
                     stops = max(0, len(stints) - 1)
             except: pass
             
-            # Smart Position Extraction (Fallback for broken Sprint Shootout Grids)
+            # Position Fallback
             pos = row.get('Position')
             if pd.isna(pos): pos = row.get('ClassifiedPosition')
             try: pos = int(float(pos))
-            except: pos = 99
+            except: pos = index + 1
 
             status = str(row.get('Status', ''))
             is_dsq = (status == 'Disqualified')
@@ -433,25 +438,44 @@ def _extract_race(year, event, session_name='Race'):
         return res
     except: return []
 
-def _extract_quali(year, event, session_name='Qualifying'):
+def _extract_quali(year, event, session_name):
+    """Segmented extraction with manual telemetry fallbacks for Sprint Qualifying"""
     try:
-        s = fastf1.get_session(year, event, session_name)
-        s.load(telemetry=False, laps=True, weather=False, messages=False)
+        # Step 1: Force accurate identifier for Sprints vs Normal Quali
+        identifier = 'SQ' if 'Sprint' in session_name or 'SQ' in session_name else 'Q'
+        s = fastf1.get_session(year, event, identifier)
+        # Step 2: Critical Fix - messages=True allows segmented Q1/Q2/Q3 calculation
+        s.load(telemetry=False, laps=True, weather=False, messages=True)
+        
         res = []
-        for _, row in s.results.iterrows():
-            # Smart Position Extraction (Fallback for broken Sprint Shootout Grids)
+        for index, (_, row) in enumerate(s.results.iterrows()):
+            # Position Fallback
             pos = row.get('Position')
             if pd.isna(pos): pos = row.get('ClassifiedPosition')
             try: pos = int(float(pos))
-            except: pos = 99
+            except: pos = index + 1
 
             status = str(row.get('Status', ''))
             is_dsq = (status == 'Disqualified')
+            
+            # Segment Column Logic (standard Q1 vs Sprint SQ1)
+            cols = s.results.columns
+            if 'Q1' in cols:
+                q1, q2, q3 = _fmt_time(row.get('Q1')), _fmt_time(row.get('Q2')), _fmt_time(row.get('Q3'))
+            elif 'SQ1' in cols:
+                q1, q2, q3 = _fmt_time(row.get('SQ1')), _fmt_time(row.get('SQ2')), _fmt_time(row.get('SQ3'))
+            elif 'BestLapTime' in cols:
+                q1, q2, q3 = _fmt_time(row.get('BestLapTime')), "-", "-"
+            else:
+                q1, q2, q3 = "-", "-", "-"
 
-            res.append({"pos": pos, "driver": str(row['Abbreviation']), "color": "#" + str(row['TeamColor']).replace('#', ''), "q1": _fmt_time(row.get('Q1')), "q2": _fmt_time(row.get('Q2')), "q3": _fmt_time(row.get('Q3')), "is_dsq": is_dsq})
-        
-        # Ensure it's sorted by pos so DSQ drops to bottom nicely if needed, or preserves FIA order
-        res.sort(key=lambda x: x['pos'] if x['pos'] != 99 else 999)
+            res.append({
+                "pos": pos, 
+                "driver": str(row['Abbreviation']), 
+                "color": "#" + str(row['TeamColor']).replace('#', ''), 
+                "q1": q1, "q2": q2, "q3": q3, 
+                "is_dsq": is_dsq
+            })
         return res
     except: return []
 
@@ -460,7 +484,6 @@ def _extract_fp_top3(year, event, session_name):
         s = fastf1.get_session(year, event, session_name)
         s.load(telemetry=False, laps=True, weather=False, messages=False)
         res = []
-        # Fallback handle missing 'Position' gracefully
         results_df = s.results.dropna(subset=['Position']).sort_values(by='Position') if 'Position' in s.results else s.results.head(3)
         for _, row in results_df.head(3).iterrows():
             pos = row.get('Position')
@@ -520,6 +543,7 @@ def _generate_and_save_recap():
         else:
             recap["results"] = _extract_fp_full(now.year, event['EventName'], last_session)
             recap["session_type"] = "Practice"
+            
     with open("recap_cache.json", "w") as f: json.dump(recap, f)
     print("[RECAP] Recap Data Saved!")
 
@@ -549,10 +573,8 @@ def read_test():
 def get_session(): 
     session_info = LIVE_DATA.get("SessionInfo", {}).copy()
     timing_data = LIVE_DATA.get("TimingData", {})
-    
     has_live_timing = bool(timing_data and timing_data.get("Lines"))
     real_status = session_info.get("SessionStatus", "Offline")
-    
     is_offline = real_status in ["Offline", "Finished"] or not session_info
     
     if has_live_timing and real_status != "Finished":
@@ -565,7 +587,6 @@ def get_session():
             try:
                 with open("recap_cache.json", "r") as f: session_info["RecapData"] = json.load(f)
             except: pass
-        
     return session_info
 
 @app.get("/api/timing")
@@ -640,7 +661,6 @@ async def replay_ws_endpoint(websocket: WebSocket):
                 start_sec, end_sec = msg['start_sec'], min(msg['end_sec'], meta["total_seconds"])
                 frames = await asyncio.to_thread(read_chunk_from_cache, year, circuit, start_sec, end_sec)
                 frames_dict = {f["t"]: f for f in frames}
-                
                 padded = []
                 steps = int((end_sec - start_sec) * 4) + 1
                 for step in range(steps):
@@ -661,13 +681,7 @@ def _build_fallback_roster():
         for drv in session.drivers:
             try:
                 info = session.get_driver(drv)
-                roster[str(drv)] = {
-                    "Tla": str(info['Abbreviation']),
-                    "TeamColour": str(info['TeamColor']).replace('#', ''),
-                    "FirstName": str(info['FirstName']),
-                    "LastName": str(info['LastName']),
-                    "Line": int(drv)
-                }
+                roster[str(drv)] = {"Tla": str(info['Abbreviation']), "TeamColour": str(info['TeamColor']).replace('#', ''), "FirstName": str(info['FirstName']), "LastName": str(info['LastName']), "Line": int(drv)}
             except: pass
         if roster:
             LIVE_DATA["DriverList"] = roster
@@ -687,13 +701,10 @@ async def f1_signalr_client():
                     data = await resp.json()
                     token = quote(data['ConnectionToken'])
                     cookie_header = "; ".join([f"{key}={val.value}" for key, val in resp.cookies.items()])
-
                 ws_url = f"wss://livetiming.formula1.com/signalr/connect?clientProtocol=1.5&transport=webSockets&connectionToken={token}&connectionData=[%7B%22name%22:%22Streaming%22%7D]"
-                
                 connect_headers = {"User-Agent": "BestHTTP"}
                 if cookie_header:
                     connect_headers["Cookie"] = cookie_header
-                    
                 async with websockets.connect(ws_url, additional_headers=connect_headers) as ws:
                     print("[SIGNALR] Connected! Subscribing to live telemetry feeds...")
                     sub_msg = {"H": "Streaming", "M": "Subscribe", "A": [["Heartbeat", "CarData.z", "Position.z", "ExtrapolatedClock", "TopThree", "RcmSeries", "TimingStats", "TimingAppData", "WeatherData", "TrackStatus", "DriverList", "RaceControlMessages", "SessionInfo", "SessionData", "LapCount", "TimingData"]], "I": 1}
