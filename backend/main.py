@@ -21,7 +21,6 @@ import datetime
 
 app = FastAPI()
 
-# Mount the F1_Frames directory so the frontend can load the scroll sequence images
 app.mount("/F1_Frames", StaticFiles(directory="F1_Frames"), name="frames")
 
 app.add_middleware(
@@ -57,7 +56,6 @@ CACHE_VERSION = 6
 COMPUTE_CHUNK_SIZE = 300
 RACES_PER_DAY = 4
 PRECOMPUTE_INTERVAL_HOURS = 6
-
 CACHE_STATUS = {}
 
 def deep_update(mapping, update_dict):
@@ -68,17 +66,10 @@ def deep_update(mapping, update_dict):
             mapping[k] = v
     return mapping
 
-def cache_key(year, circuit):
-    return f"{year}_{circuit.replace(' ', '_').replace('/', '-')}"
-
-def cache_path(year, circuit):
-    return os.path.join("replay_cache", f"{cache_key(year, circuit)}.jsonl")
-
-def index_path(year, circuit):
-    return os.path.join("replay_cache", f"{cache_key(year, circuit)}.index.json")
-
-def meta_path(year, circuit):
-    return os.path.join("replay_cache", f"{cache_key(year, circuit)}.meta.json")
+def cache_key(year, circuit): return f"{year}_{circuit.replace(' ', '_').replace('/', '-')}"
+def cache_path(year, circuit): return os.path.join("replay_cache", f"{cache_key(year, circuit)}.jsonl")
+def index_path(year, circuit): return os.path.join("replay_cache", f"{cache_key(year, circuit)}.index.json")
+def meta_path(year, circuit): return os.path.join("replay_cache", f"{cache_key(year, circuit)}.meta.json")
 
 def is_fully_cached(year, circuit):
     for p in [cache_path(year, circuit), index_path(year, circuit), meta_path(year, circuit)]:
@@ -417,12 +408,28 @@ def _extract_race(year, event, session_name='Race'):
                         stints.append({"tyre": compound, "laps": len(group)})
                     stops = max(0, len(stints) - 1)
             except: pass
-            if pd.notna(row['Position']) and int(row['Position']) == 1: gap_str = "Winner"
+            
+            # Smart Position Extraction (Fallback for broken Sprint Shootout Grids)
+            pos = row.get('Position')
+            if pd.isna(pos): pos = row.get('ClassifiedPosition')
+            try: pos = int(float(pos))
+            except: pos = 99
+
+            status = str(row.get('Status', ''))
+            is_dsq = (status == 'Disqualified')
+
+            if pos == 1: 
+                gap_str = "Winner"
+            elif is_dsq:
+                gap_str = "DSQ"
+            elif "Lap" in status:
+                gap_str = status
             else:
-                gap = row['Time']
-                if pd.isna(gap): gap_str = str(row.get('Status', ''))
+                gap = row.get('Time')
+                if pd.isna(gap): gap_str = status
                 else: gap_str = f"+{gap.total_seconds():.3f}s"
-            res.append({"pos": int(row['Position']) if pd.notna(row['Position']) else 99, "driver": str(row['Abbreviation']), "color": "#" + str(row['TeamColor']).replace('#', ''), "grid": int(row['GridPosition']) if pd.notna(row['GridPosition']) else 0, "gap": gap_str, "stops": stops, "fastest": (drv == fastest_driver), "stints": stints})
+                
+            res.append({"pos": pos, "driver": str(row['Abbreviation']), "color": "#" + str(row['TeamColor']).replace('#', ''), "grid": int(row['GridPosition']) if pd.notna(row['GridPosition']) else 0, "gap": gap_str, "stops": stops, "fastest": (drv == fastest_driver), "stints": stints, "is_dsq": is_dsq})
         return res
     except: return []
 
@@ -432,7 +439,19 @@ def _extract_quali(year, event, session_name='Qualifying'):
         s.load(telemetry=False, laps=True, weather=False, messages=False)
         res = []
         for _, row in s.results.iterrows():
-            res.append({"pos": int(row['Position']) if pd.notna(row['Position']) else 99, "driver": str(row['Abbreviation']), "color": "#" + str(row['TeamColor']).replace('#', ''), "q1": _fmt_time(row.get('Q1')), "q2": _fmt_time(row.get('Q2')), "q3": _fmt_time(row.get('Q3'))})
+            # Smart Position Extraction (Fallback for broken Sprint Shootout Grids)
+            pos = row.get('Position')
+            if pd.isna(pos): pos = row.get('ClassifiedPosition')
+            try: pos = int(float(pos))
+            except: pos = 99
+
+            status = str(row.get('Status', ''))
+            is_dsq = (status == 'Disqualified')
+
+            res.append({"pos": pos, "driver": str(row['Abbreviation']), "color": "#" + str(row['TeamColor']).replace('#', ''), "q1": _fmt_time(row.get('Q1')), "q2": _fmt_time(row.get('Q2')), "q3": _fmt_time(row.get('Q3')), "is_dsq": is_dsq})
+        
+        # Ensure it's sorted by pos so DSQ drops to bottom nicely if needed, or preserves FIA order
+        res.sort(key=lambda x: x['pos'] if x['pos'] != 99 else 999)
         return res
     except: return []
 
@@ -441,9 +460,12 @@ def _extract_fp_top3(year, event, session_name):
         s = fastf1.get_session(year, event, session_name)
         s.load(telemetry=False, laps=True, weather=False, messages=False)
         res = []
-        sorted_results = s.results.dropna(subset=['Position']).sort_values(by='Position')
-        for _, row in sorted_results.head(3).iterrows():
-            res.append({"pos": int(row['Position']), "driver": str(row['Abbreviation']), "color": "#" + str(row['TeamColor']).replace('#', ''), "time": _fmt_time(row.get('BestLapTime'))})
+        # Fallback handle missing 'Position' gracefully
+        results_df = s.results.dropna(subset=['Position']).sort_values(by='Position') if 'Position' in s.results else s.results.head(3)
+        for _, row in results_df.head(3).iterrows():
+            pos = row.get('Position')
+            pos = int(pos) if pd.notna(pos) else 99
+            res.append({"pos": pos, "driver": str(row['Abbreviation']), "color": "#" + str(row['TeamColor']).replace('#', ''), "time": _fmt_time(row.get('BestLapTime'))})
         return res
     except: return []
 
@@ -475,12 +497,19 @@ def _generate_and_save_recap():
     last_session = sessions_finished[-1]
     is_off_week = (last_session == "Race")
     recap = {"is_recap": True, "recap_mode": "off_week" if is_off_week else "mid_weekend", "event_name": event['EventName'], "last_session": last_session, "timestamp": str(now)}
+    
     if is_off_week:
-        recap["race"] = _extract_race(now.year, event['EventName'])
+        recap["race"] = _extract_race(now.year, event['EventName'], 'Race')
         recap["quali"] = _extract_quali(now.year, event['EventName'], 'Qualifying')
+        
         fp_mapping = {'Practice 1': 'fp1', 'Practice 2': 'fp2', 'Practice 3': 'fp3'}
-        for session_name in sessions_finished:
-            if session_name in fp_mapping: recap[fp_mapping[session_name]] = _extract_fp_top3(now.year, event['EventName'], session_name)
+        for s_name in sessions_finished:
+            if s_name in ['Sprint Shootout', 'Sprint Qualifying', 'SQ']:
+                recap["sprint_quali"] = _extract_quali(now.year, event['EventName'], s_name)
+            elif s_name == 'Sprint':
+                recap["sprint"] = _extract_race(now.year, event['EventName'], s_name)
+            elif s_name in fp_mapping:
+                recap[fp_mapping[s_name]] = _extract_fp_top3(now.year, event['EventName'], s_name)
     else:
         if last_session in ['Qualifying', 'Sprint Shootout', 'Sprint Qualifying', 'SQ']:
             recap["results"] = _extract_quali(now.year, event['EventName'], last_session)
@@ -512,6 +541,9 @@ def read_replay():
 @app.get("/mapper")
 def read_mapper():
    with open("mapper.html", "r") as f: return HTMLResponse(content=f.read())
+@app.get("/test")
+def read_test():
+   with open("test.html", "r") as f: return HTMLResponse(content=f.read())
 
 @app.get("/api/session")
 def get_session(): 
@@ -521,18 +553,14 @@ def get_session():
     has_live_timing = bool(timing_data and timing_data.get("Lines"))
     real_status = session_info.get("SessionStatus", "Offline")
     
-    # 1. Trust the explicit Finished state from the FIA
     is_offline = real_status in ["Offline", "Finished"] or not session_info
     
-    # 2. THE OVERRIDE: Force active ONLY if we have data and the FIA hasn't explicitly told us it's over
     if has_live_timing and real_status != "Finished":
         is_offline = False
         session_info["SessionStatus"] = "Active"
         session_info["Type"] = session_info.get("Type", "Practice")
         
     if is_offline and os.path.exists("recap_cache.json"):
-        # 3. The Amnesia Fix: Only load Japan archive if we DON'T have Miami data in RAM
-        # This allows the frontend to show the "Session Ended" screen using the final live telemetry!
         if not has_live_timing:
             try:
                 with open("recap_cache.json", "r") as f: session_info["RecapData"] = json.load(f)
@@ -627,7 +655,6 @@ async def replay_ws_endpoint(websocket: WebSocket):
 def _build_fallback_roster():
     print("[ROSTER] Building offline decoder ring from FastF1 cache...")
     try:
-        # Load the previous race (Japan 2026) to dynamically extract the grid names
         session = fastf1.get_session(2026, 'Japan', 'R')
         session.load(telemetry=False, weather=False, messages=False, laps=False)
         roster = {}
@@ -698,7 +725,6 @@ async def data_engine(): pass
 
 @app.on_event("startup")
 async def startup_event():
-    # Execute the offline roster builder silently in the background right as the server boots up
     asyncio.create_task(asyncio.to_thread(_build_fallback_roster))
     asyncio.create_task(f1_signalr_client())
     asyncio.create_task(data_engine())
