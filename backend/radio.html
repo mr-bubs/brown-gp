@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Brown GP | Radio Live</title>
+<style>
+    :root { --red: #e10600; --bg: #080a0e; --surface2: #13161f; --surface3: #1a1d28; --border: #1e2230; --border2: #252838; --text: #f0f0f0; --text-dim: #6b7280; --text-mid: #9ca3af; --green: #00d2be; --yellow: #ffe600; }
+    * { margin: 0; padding: 0; box-sizing: border-box; touch-action: none; }
+    body { background: var(--bg); color: var(--text); font-family: 'Titillium Web', sans-serif; height: 100vh; overflow: hidden; }
+    .floating-box { position: absolute; background: rgba(19, 22, 31, 0.9); border: 1px solid var(--border2); border-radius: 4px; display: flex; flex-direction: column; overflow: hidden; }
+    .box-header { background: var(--surface3); border-bottom: 1px solid var(--border); padding: 10px 14px; font-family: 'Roboto Mono', monospace; font-size: 10px; font-weight: 700; color: var(--text-dim); cursor: grab; }
+    #rcm-box { width: 340px; height: 400px; top: 60px; left: 40px; }
+    #rcm-content { flex: 1; overflow-y: auto; padding: 12px; }
+    #radio-box { width: 280px; top: 60px; right: 40px; }
+    .radio-body { padding: 20px; display: flex; flex-direction: column; align-items: center; }
+    .log-entry { font-family: 'Roboto Mono', monospace; font-size: 11px; color: var(--text-mid); padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+    .log-time { color: var(--red); font-weight: 700; margin-right: 6px; }
+</style>
+</head>
+<body>
+
+<div id="rcm-box" class="floating-box">
+    <div class="box-header" id="rcm-handle">RACE CONTROL</div>
+    <div id="rcm-content"><div class="log-entry">Waiting for live data...</div></div>
+</div>
+
+<div id="radio-box" class="floating-box">
+    <div class="box-header" id="radio-handle">TEAM RADIO</div>
+    <div class="radio-body">
+        <div id="ui-drv-num" style="font-size:32px; font-weight:900;">--</div>
+        <audio id="audio-player"></audio>
+        <button onclick="document.getElementById('audio-player').play()">PLAY</button>
+    </div>
+</div>
+
+<script>
+function makeDraggable(boxId, handleId) {
+    const box = document.getElementById(boxId);
+    const handle = document.getElementById(handleId);
+    let isDragging = false, startX, startY, initialX, initialY;
+    handle.addEventListener('pointerdown', e => {
+        isDragging = true; startX = e.clientX; startY = e.clientY;
+        const rect = box.getBoundingClientRect(); initialX = rect.left; initialY = rect.top;
+        handle.setPointerCapture(e.pointerId);
+    });
+    handle.addEventListener('pointermove', e => {
+        if (!isDragging) return;
+        box.style.left = (initialX + e.clientX - startX) + 'px';
+        box.style.top = (initialY + e.clientY - startY) + 'px';
+    });
+    handle.addEventListener('pointerup', e => { isDragging = false; handle.releasePointerCapture(e.pointerId); });
+}
+makeDraggable('rcm-box', 'rcm-handle');
+makeDraggable('radio-box', 'radio-handle');
+
+const ws = new WebSocket(`ws://${location.host}/ws`);
+ws.onmessage = e => {
+    try {
+        const data = JSON.parse(e.data); // Fixed: JSON.parse
+        if (data.type === 'live_update') {
+            if (data.RaceControlMessages?.Messages) {
+                data.RaceControlMessages.Messages.forEach(m => {
+                    const div = document.createElement('div');
+                    div.className = 'log-entry';
+                    div.innerHTML = `<span class="log-time">${m.Utc.split('T')[1].slice(0,8)}</span> ${m.Message}`;
+                    const content = document.getElementById('rcm-content');
+                    content.insertBefore(div, content.firstChild);
+                });
+            }
+            if (data.TeamRadio?.Captures) {
+                data.TeamRadio.Captures.forEach(r => {
+                    document.getElementById('ui-drv-num').innerText = r.RacingNumber;
+                    const audio = document.getElementById('audio-player');
+                    audio.src = 'https://livetiming.formula1.com/static/' + r.Path;
+                });
+            }
+        }
+    } catch (err) { console.error(err); }
+};
+</script>
+</body>
+</html>

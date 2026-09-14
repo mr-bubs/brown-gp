@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Brown GP | Live Tracker</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Titillium+Web:wght@300;400;600;700;900&family=Roboto+Mono:wght@400;500;700&display=swap');
+
+:root {
+    --red: #e10600;
+    --bg: #080a0e;
+    --surface: #0e1117;
+    --surface2: #13161f;
+    --surface3: #1a1d28;
+    --border: #1e2230;
+    --border2: #252838;
+    --text: #f0f0f0;
+    --text-dim: #6b7280;
+    --text-mid: #9ca3af;
+    --green: #00d2be;
+    --yellow: #ffe600;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: var(--bg); color: var(--text); font-family: 'Titillium Web', sans-serif; overflow: hidden; height: 100vh; touch-action: none; }
+.top-bar { position: fixed; top: 0; left: 0; right: 0; height: 3px; background: var(--red); z-index: 100; }
+
+.page-header { position: absolute; top: 20px; left: 20px; z-index: 50; pointer-events: none; }
+.page-eyebrow { display: flex; align-items: center; gap: 6px; font-family: 'Roboto Mono', monospace; font-size: 10px; letter-spacing: 3px; color: var(--red); text-transform: uppercase; margin-bottom: 4px; }
+.live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--red); animation: pulse 1.5s infinite; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+#session-title { font-size: 24px; font-weight: 900; letter-spacing: -0.5px; text-shadow: 0 4px 12px rgba(0,0,0,0.8); margin-bottom: 10px; }
+
+/* Ghost Engine HUD */
+#debug-hud {
+    font-family: 'Roboto Mono', monospace;
+    font-size: 10px;
+    color: var(--green);
+    background: rgba(0, 0, 0, 0.7);
+    border: 1px solid var(--border2);
+    padding: 10px;
+    border-radius: 4px;
+    white-space: pre-wrap;
+    width: 250px;
+    pointer-events: none;
+    text-shadow: none;
+}
+
+/* Map Canvas */
+#trackCanvas { width: 100vw; height: 100vh; display: block; cursor: grab; }
+#trackCanvas:active { cursor: grabbing; }
+
+/* Overlay UI Container */
+.ui-layer { position: absolute; inset: 0; pointer-events: none; z-index: 10; }
+
+/* Camera Controls */
+.cam-controls { position: absolute; bottom: 20px; right: 20px; display: flex; align-items: flex-end; gap: 16px; pointer-events: auto; }
+
+.btn-group { display: flex; flex-direction: column; gap: 10px; }
+.cam-btn { 
+    width: 44px; height: 44px; border-radius: 50%; 
+    background: rgba(19, 22, 31, 0.8); backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,0.1); color: var(--text);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+}
+.cam-btn:active { transform: scale(0.9); }
+.cam-btn.active { border-color: var(--red); color: var(--red); background: rgba(225, 6, 0, 0.1); }
+
+/* Joystick */
+#joystick-zone { 
+    width: 110px; height: 110px; border-radius: 50%; 
+    background: rgba(255,255,255,0.05); border: 2px solid rgba(255,255,255,0.1); 
+    display: flex; justify-content: center; align-items: center; 
+    touch-action: none; box-shadow: inset 0 0 20px rgba(0,0,0,0.5); transition: opacity 0.3s;
+}
+#joystick-zone.locked { opacity: 0.3; pointer-events: none; border-color: rgba(225,6,0,0.3); }
+#joystick-knob { 
+    width: 44px; height: 44px; background: linear-gradient(135deg, var(--red), #800000); 
+    border-radius: 50%; box-shadow: 0 4px 10px rgba(0,0,0,0.8), inset 0 2px 5px rgba(255,255,255,0.2); 
+    pointer-events: none; transition: transform 0.1s ease-out; 
+}
+
+#loading-overlay {
+    position: fixed; inset: 0; background: var(--bg); display: flex; flex-direction: column;
+    align-items: center; justify-content: center; z-index: 1000;
+}
+.spinner { width: 40px; height: 40px; border: 3px solid var(--border2); border-top-color: var(--red); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text { font-family: 'Roboto Mono', monospace; font-size: 11px; letter-spacing: 2px; color: var(--text-dim); text-transform: uppercase; text-align: center; line-height: 1.6;}
+
+</style>
+</head>
+<body>
+
+<div class="top-bar"></div>
+
+<div id="loading-overlay">
+    <div class="spinner"></div>
+    <div class="loading-text" id="load-msg">Awaiting F1 SignalR Feed<br>Please stand by...</div>
+</div>
+
+<div class="page-header">
+    <div class="page-eyebrow"><div class="live-dot"></div> Live Tracker</div>
+    <div id="session-title">Awaiting Session...</div>
+    <div id="debug-hud">Initializing Engine...</div>
+</div>
+
+<canvas id="trackCanvas"></canvas>
+
+<div class="ui-layer">
+    <div class="cam-controls">
+        <div class="btn-group">
+            <button class="cam-btn" id="btn-lock" title="Lock Rotation/Tilt">🔒</button>
+            <button class="cam-btn" id="btn-reset" title="Reset Camera">⊙</button>
+        </div>
+        <div id="joystick-zone">
+            <div id="joystick-knob"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+// --- STATE & DATA ---
+let trackEdges = [];
+let cx = 0, cy = 0, cz = 0, minZ = 0, maxZ = 1;
+let trackX = [], trackY = [], trackZ = [];
+let cars = {}; 
+let driverDict = {};
+
+let trackLoaded = false;
+let loadingTrack = false;
+window.lastRenderTime = performance.now();
+
+// --- CAMERA STATE ---
+const DEFAULT_ZOOM = 1.1;
+const DEFAULT_TILT = 40 * Math.PI / 180;
+let rot = 0;
+let zoom = DEFAULT_ZOOM;
+let tilt = DEFAULT_TILT; 
+let panX = 0, panY = 0;
+let joystickLocked = false;
+
+const canvas = document.getElementById('trackCanvas');
+const ctx = canvas.getContext('2d');
+const btnLock = document.getElementById('btn-lock');
+const btnReset = document.getElementById('btn-reset');
+const debugHud = document.getElementById('debug-hud');
+
+function resizeCanvas() {
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = window.innerWidth * dpr;
+    canvas.height = window.innerHeight * dpr;
+    ctx.resetTransform();
+    ctx.scale(dpr, dpr);
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+// Start WS connection immediately on boot
+connectLiveWS();
+
+function connectLiveWS() {
+    const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const ws = new WebSocket(`${protocol}//${location.host}/ws/live-tracker`);
+    
+    ws.onmessage = (e) => {
+        const msg = JSON.parse(e.data);
+        if (msg.type === 'live_update') {
+            
+            // 🚨 FIX 2: Instantiate all 20 cars immediately when DriverList arrives
+            if (msg.DriverList) {
+                Object.assign(driverDict, msg.DriverList);
+                Object.keys(driverDict).forEach(carNum => {
+                    const profile = driverDict[carNum];
+                    if (!cars[carNum]) {
+                        cars[carNum] = {
+                            visualFraction: 0,   // Display position
+                            fraction: 0,         // Target math position
+                            inPit: true,         // Default to PIT until they cross a sector
+                            stopped: false,
+                            name: profile.Tla || profile.Abbreviation || carNum,
+                            color: '#' + (profile.TeamColour || 'ffffff').replace('#','')
+                        };
+                    } else {
+                        // Update colors if missing previously
+                        cars[carNum].name = profile.Tla || profile.Abbreviation || cars[carNum].name;
+                        if (profile.TeamColour) cars[carNum].color = '#' + profile.TeamColour.replace('#','');
+                    }
+                });
+            }
+            
+            // 🚨 FIX 1: DYNAMIC TRACK LOADING
+            // When SessionInfo arrives, extract the event name and ask the Python backend for the 3D map
+            if (msg.SessionInfo && msg.SessionInfo.Meeting && msg.SessionInfo.Meeting.Name) {
+                let eventName = msg.SessionInfo.Meeting.Name;
+                let eventYear = new Date(msg.SessionInfo.StartDate).getFullYear() || new Date().getFullYear();
+                
+                const parts = document.getElementById('session-title').innerText.split(' - ');
+                document.getElementById('session-title').innerText = `${eventName} - ${msg.SessionInfo.Name || 'Live'}`;
+                
+                if (!trackLoaded && !loadingTrack) {
+                    loadingTrack = true;
+                    document.getElementById('load-msg').innerText = `Live Feed Secured.\nAcquiring 3D Geometry for ${eventName}...`;
+                    
+                    fetch(`/api/track?event_name=${encodeURIComponent(eventName)}&year=${eventYear}`)
+                        .then(r => r.json())
+                        .then(data => {
+                            if (data.x && data.x.length > 0) {
+                                setupTrackGeometry(data);
+                                trackLoaded = true;
+                                document.getElementById('loading-overlay').style.display = 'none';
+                                requestAnimationFrame(renderLoop);
+                            } else {
+                                document.getElementById('load-msg').innerText = `Error building map: ${data.error}`;
+                                document.getElementById('load-msg').style.color = "var(--red)";
+                                loadingTrack = false; // Allow retry
+                            }
+                        })
+                        .catch(err => {
+                            document.getElementById('load-msg').innerText = "Failed to communicate with API.";
+                            document.getElementById('load-msg').style.color = "var(--red)";
+                            loadingTrack = false;
+                        });
+                }
+            }
+            
+            // 🚨 GHOST ENGINE PARSER 🚨
+            if (msg.TimingData && msg.TimingData.Lines) {
+                let lines = msg.TimingData.Lines;
+                Object.keys(lines).forEach(carNum => {
+                    
+                    // Fallback init in case TimingData arrives before DriverList
+                    if (!cars[carNum]) {
+                        const profile = driverDict[carNum] || {};
+                        cars[carNum] = {
+                            visualFraction: 0, fraction: 0, inPit: true, stopped: false,
+                            name: profile.Tla || profile.Abbreviation || carNum,
+                            color: '#' + (profile.TeamColour || 'ffffff').replace('#','')
+                        };
+                    }
+                    
+                    let car = cars[carNum];
+                    let update = lines[carNum];
+                    
+                    if (update.InPit !== undefined) car.inPit = update.InPit;
+                    if (update.Stopped !== undefined) car.stopped = update.Stopped;
+                    
+                    // Reset to Start/Finish line
+                    if (update.NumberOfLaps !== undefined || (update.LastLapTime && update.LastLapTime.Value)) {
+                        car.fraction = 0.0;
+                        car.visualFraction = 0.0; 
+                    }
+                    
+                    // Mini-Sector Location Pings
+                    if (update.Sectors) {
+                        Object.keys(update.Sectors).forEach(sIdx => {
+                            let sector = update.Sectors[sIdx];
+                            let s = parseInt(sIdx);
+                            
+                            if (sector.Segments) {
+                                Object.keys(sector.Segments).forEach(segIdx => {
+                                    let seg = parseInt(segIdx);
+                                    let f = (s * 0.3333) + ((seg + 1) * 0.0333);
+                                    if (f > car.fraction) car.fraction = Math.min(f, 0.99);
+                                });
+                            }
+                            
+                            if (sector.Value) { 
+                                let f = (s + 1) * 0.3333;
+                                if (f > car.fraction) car.fraction = Math.min(f, 0.99);
+                            }
+                        });
+                    }
+                });
+            }
+
+            // HUD Monitor
+            let debugText = `GHOST ENGINE ACTIVE\n`;
+            debugText += `LAST PKT: ${new Date().toLocaleTimeString()}\n`;
+            debugText += `TOTAL CARS INSTANTIATED: ${Object.keys(cars).length}\n\n`;
+            
+            ["1", "44", "16", "4", "81", "55"].forEach(num => {
+                if (cars[num]) {
+                    let pct = (cars[num].visualFraction * 100).toFixed(1);
+                    let state = cars[num].inPit ? 'PIT' : (cars[num].stopped ? 'STOP' : 'TRK');
+                    debugText += `C${num}: ${pct}% [${state}]\n`;
+                }
+            });
+            debugHud.innerText = debugText;
+        }
+    };
+    ws.onclose = () => setTimeout(connectLiveWS, 2000);
+}
+
+function setupTrackGeometry(track) {
+    trackX = track.x; trackY = track.y; trackZ = track.z;
+    cx = (Math.max(...trackX) + Math.min(...trackX)) / 2;
+    cy = (Math.max(...trackY) + Math.min(...trackY)) / 2;
+    cz = (Math.max(...trackZ) + Math.min(...trackZ)) / 2;
+    maxZ = Math.max(...trackZ); minZ = Math.min(...trackZ);
+
+    trackEdges = [];
+    const TRACK_WIDTH = 120; 
+    for(let i=0; i<trackX.length; i++) {
+        let prev = (i - 1 + trackX.length) % trackX.length;
+        let next = (i + 1) % trackX.length;
+        let dx = trackX[next] - trackX[prev];
+        let dy = trackY[next] - trackY[prev];
+        let len = Math.hypot(dx, dy) || 1;
+        let nx = -dy / len;
+        let ny = dx / len;
+        
+        trackEdges.push({
+            lx: trackX[i] + nx * TRACK_WIDTH, ly: trackY[i] + ny * TRACK_WIDTH,
+            rx: trackX[i] - nx * TRACK_WIDTH, ry: trackY[i] - ny * TRACK_WIDTH,
+            z: trackZ[i]
+        });
+    }
+}
+
+// --- MULTI-TOUCH ENGINE (PAN & PINCH) ---
+let touchCache = [];
+let initialPinchDistance = null;
+let initialZoom = 1;
+
+canvas.addEventListener('pointerdown', e => { touchCache.push(e); canvas.setPointerCapture(e.pointerId); });
+canvas.addEventListener('pointermove', e => {
+    const index = touchCache.findIndex(t => t.pointerId === e.pointerId);
+    if (index !== -1) touchCache[index] = e;
+
+    if (touchCache.length === 1) { panX += e.movementX; panY += e.movementY; } 
+    else if (touchCache.length === 2) {
+        const dx = touchCache[0].clientX - touchCache[1].clientX;
+        const dy = touchCache[0].clientY - touchCache[1].clientY;
+        const currentDist = Math.hypot(dx, dy);
+
+        if (initialPinchDistance == null) { initialPinchDistance = currentDist; initialZoom = zoom; } 
+        else { zoom = Math.max(0.1, Math.min(initialZoom * (currentDist / initialPinchDistance), 100)); }
+    }
+});
+
+function removeTouch(e) {
+    const index = touchCache.findIndex(t => t.pointerId === e.pointerId);
+    if (index !== -1) touchCache.splice(index, 1);
+    if (touchCache.length < 2) initialPinchDistance = null;
+}
+canvas.addEventListener('pointerup', removeTouch);
+canvas.addEventListener('pointercancel', removeTouch);
+canvas.addEventListener('pointerout', removeTouch);
+canvas.addEventListener('wheel', e => { e.preventDefault(); zoom += e.deltaY * -0.001; zoom = Math.max(0.1, Math.min(zoom, 100)); });
+
+
+// --- JOYSTICK LOGIC (ROTATE & TILT) ---
+let isJoy = false, joyX = 0, joyY = 0;
+const joyBase = document.getElementById('joystick-zone');
+const joyKnob = document.getElementById('joystick-knob');
+
+btnLock.addEventListener('click', () => {
+    joystickLocked = !joystickLocked;
+    btnLock.classList.toggle('active');
+    if (joystickLocked) { joyBase.classList.add('locked'); btnLock.innerText = '🔓'; isJoy = false; } 
+    else { joyBase.classList.remove('locked'); btnLock.innerText = '🔒'; }
+});
+
+btnReset.addEventListener('click', () => {
+    panX = 0; panY = 0; zoom = DEFAULT_ZOOM; rot = 0; tilt = DEFAULT_TILT;
+    btnReset.style.transform = 'rotate(-360deg)';
+    setTimeout(() => btnReset.style.transform = '', 300);
+});
+
+joyBase.addEventListener('pointerdown', e => { if (joystickLocked) return; isJoy = true; joyBase.setPointerCapture(e.pointerId); joyKnob.style.transition = 'none'; updateJoy(e); });
+joyBase.addEventListener('pointermove', e => { if (isJoy) updateJoy(e); });
+joyBase.addEventListener('pointerup', e => { isJoy = false; joyKnob.style.transition = 'transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)'; joyKnob.style.transform = `translate(0px, 0px)`; joyX = 0; joyY = 0; });
+
+function updateJoy(e) {
+    const rect = joyBase.getBoundingClientRect();
+    const cxJoy = rect.width / 2, cyJoy = rect.height / 2;
+    let dx = e.clientX - rect.left - cxJoy, dy = e.clientY - rect.top - cyJoy;
+    const dist = Math.min(Math.sqrt(dx*dx + dy*dy), cxJoy - 10);
+    const ang = Math.atan2(dy, dx);
+    joyX = Math.cos(ang) * dist; joyY = Math.sin(ang) * dist;
+    joyKnob.style.transform = `translate(${joyX}px, ${joyY}px)`;
+}
+
+function applyJoyCamera() {
+    if (isJoy && !joystickLocked) {
+        const rect = joyBase.getBoundingClientRect();
+        rot += (joyX / (rect.width/2)) * 0.04;
+        let tiltDelta = (joyY / (rect.height/2)) * 0.04;
+        tilt -= tiltDelta; 
+        tilt = Math.max(0, Math.min(tilt, Math.PI / 2)); 
+    }
+}
+
+
+// --- 3D RENDER ENGINE ---
+function renderLoop() {
+    applyJoyCamera(); 
+    
+    const cw = window.innerWidth, ch = window.innerHeight;
+    ctx.clearRect(0, 0, cw, ch);
+    
+    if (trackEdges.length === 0) return;
+
+    let renderObjects = [];
+    let baseScale = (Math.min(cw, ch) / 12000) * zoom;
+    const Z_EXAGGERATE = 12; 
+
+    function project3D(x, y, z) {
+        let dx = x - cx, dy = cy - y, dz = (z - cz) * Z_EXAGGERATE; 
+        let rx = dx * Math.cos(rot) - dy * Math.sin(rot);
+        let ry = dx * Math.sin(rot) + dy * Math.cos(rot);
+        let px = rx;
+        let py = ry * Math.cos(tilt) - dz * Math.sin(tilt);
+        px = (cw / 2) + (px * baseScale) + panX;
+        py = (ch / 2) + (py * baseScale) + panY;
+        let depth = ry * Math.sin(tilt) + dz * Math.cos(tilt);
+        return { x: px, y: py, d: depth };
+    }
+
+    function getAltitudeColor(z) {
+        let ratio = Math.max(0, Math.min(1, (z - minZ) / (maxZ - minZ || 1)));
+        let hue = (1 - ratio) * 240; 
+        return `hsl(${hue}, 100%, 50%)`;
+    }
+
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)'; ctx.lineWidth = 1; ctx.beginPath();
+    let gridSize = 1500; let floorZ = minZ - 30; 
+    let sX = Math.floor((cx - 10000) / gridSize) * gridSize, eX = Math.ceil((cx + 10000) / gridSize) * gridSize;
+    let sY = Math.floor((cy - 10000) / gridSize) * gridSize, eY = Math.ceil((cy + 10000) / gridSize) * gridSize;
+
+    for (let x = sX; x <= eX; x += gridSize) { let p1 = project3D(x, sY, floorZ), p2 = project3D(x, eY, floorZ); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); }
+    for (let y = sY; y <= eY; y += gridSize) { let p1 = project3D(sX, y, floorZ), p2 = project3D(eX, y, floorZ); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); }
+    ctx.stroke();
+
+    for (let i = 0; i < trackEdges.length; i++) {
+        let nextIdx = (i + 1) % trackEdges.length;
+        let e1 = trackEdges[i], e2 = trackEdges[nextIdx];
+        
+        let pl1 = project3D(e1.lx, e1.ly, e1.z), pr1 = project3D(e1.rx, e1.ry, e1.z);
+        let pl2 = project3D(e2.lx, e2.ly, e2.z), pr2 = project3D(e2.rx, e2.ry, e2.z);
+
+        renderObjects.push({ type: 'track', pl1, pr1, pl2, pr2, depth: (pl1.d + pr1.d + pl2.d + pr2.d) / 4, color: getAltitudeColor(e1.z) });
+
+        if (i % 25 === 0) {
+            let pTopL = project3D(e1.lx, e1.ly, e1.z), pBotL = project3D(e1.lx, e1.ly, floorZ);
+            let pTopR = project3D(e1.rx, e1.ry, e1.z), pBotR = project3D(e1.rx, e1.ry, floorZ);
+            renderObjects.push({ type: 'pillar', pTop: pTopL, pBot: pBotL, depth: pTopL.d + 0.1 });
+            renderObjects.push({ type: 'pillar', pTop: pTopR, pBot: pBotR, depth: pTopR.d + 0.1 });
+        }
+    }
+
+    let finishEdge = trackEdges[0];
+    let pFinishL = project3D(finishEdge.lx, finishEdge.ly, finishEdge.z), pFinishR = project3D(finishEdge.rx, finishEdge.ry, finishEdge.z);
+    renderObjects.push({ type: 'finish_line', pL: pFinishL, pR: pFinishR, depth: (pFinishL.d + pFinishR.d) / 2 - 1 });
+
+    // 🚨 GHOST ENGINE PHYSICS LOOP 🚨
+    let now = performance.now();
+    let dt = now - window.lastRenderTime;
+    window.lastRenderTime = now;
+
+    Object.values(cars).forEach(car => {
+        if (car.inPit || car.stopped) {
+            car.visualFraction = 0; // Park the car cleanly on the line
+        } else {
+            let diff = car.fraction - car.visualFraction;
+            
+            // Did they cross the finish line?
+            if (car.visualFraction > 0.8 && car.fraction < 0.2) {
+                car.visualFraction = car.fraction;
+            } else if (diff > 0) {
+                // Smooth Lerp towards the newly arrived mini-sector ping
+                car.visualFraction += diff * 0.05; 
+            } else {
+                // Dead Reckoning: Keep the car moving smoothly between network pings
+                car.visualFraction += 0.000012 * dt; 
+            }
+            if (car.visualFraction > 0.99) car.visualFraction = 0.99;
+        }
+        
+        let trackLen = trackX.length;
+        if (trackLen > 0) {
+            // Map the lap percentage directly to the 3D track array (Perfect Z-Axis lock)
+            let trackIndex = Math.floor(car.visualFraction * (trackLen - 1));
+            trackIndex = Math.max(0, Math.min(trackIndex, trackLen - 1));
+            
+            let cx_pos = trackX[trackIndex];
+            let cy_pos = trackY[trackIndex];
+            let cz_pos = trackZ[trackIndex];
+            
+            let p = project3D(cx_pos, cy_pos, cz_pos);
+            renderObjects.push({ type: 'car', p, color: car.color, name: car.name, depth: p.d - 10 });
+        }
+    });
+
+    renderObjects.sort((a, b) => b.depth - a.depth);
+
+    renderObjects.forEach(obj => {
+        if (obj.type === 'pillar') {
+            ctx.beginPath(); ctx.moveTo(obj.pTop.x, obj.pTop.y); ctx.lineTo(obj.pBot.x, obj.pBot.y);
+            ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = Math.max(1, 1 * zoom); ctx.stroke();
+        } else if (obj.type === 'track') {
+            ctx.beginPath(); ctx.moveTo(obj.pl1.x, obj.pl1.y); ctx.lineTo(obj.pr1.x, obj.pr1.y); ctx.lineTo(obj.pr2.x, obj.pr2.y); ctx.lineTo(obj.pl2.x, obj.pl2.y); ctx.closePath();
+            ctx.fillStyle = '#161822'; ctx.fill(); ctx.strokeStyle = '#161822'; ctx.lineWidth = 1; ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(obj.pl1.x, obj.pl1.y); ctx.lineTo(obj.pl2.x, obj.pl2.y); ctx.strokeStyle = obj.color; ctx.lineWidth = Math.max(1, 2 * zoom); ctx.lineCap = 'round'; ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(obj.pr1.x, obj.pr1.y); ctx.lineTo(obj.pr2.x, obj.pr2.y); ctx.strokeStyle = obj.color; ctx.lineWidth = Math.max(1, 2 * zoom); ctx.lineCap = 'round'; ctx.stroke();
+        } else if (obj.type === 'finish_line') {
+            ctx.beginPath(); ctx.moveTo(obj.pL.x, obj.pL.y); ctx.lineTo(obj.pR.x, obj.pR.y); ctx.lineWidth = Math.max(4, 6 * zoom); ctx.strokeStyle = '#ffffff'; ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(obj.pL.x, obj.pL.y); ctx.lineTo(obj.pR.x, obj.pR.y); ctx.lineWidth = Math.max(4, 6 * zoom); ctx.strokeStyle = '#000000'; ctx.setLineDash([Math.max(4, 6 * zoom), Math.max(4, 6 * zoom)]); ctx.stroke(); ctx.setLineDash([]);
+        } else if (obj.type === 'car') {
+            let dynRadius = Math.max(3, 6 * zoom), dynFont = Math.max(8, 10 * zoom), dynShadowOffset = 4 * Math.max(0.5, zoom);
+            ctx.beginPath(); ctx.arc(obj.p.x, obj.p.y + dynShadowOffset, dynRadius, 0, Math.PI*2); ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fill();
+            ctx.beginPath(); ctx.arc(obj.p.x, obj.p.y, dynRadius, 0, Math.PI*2); ctx.fillStyle = obj.color; ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = Math.max(1, 1.5 * zoom); ctx.stroke();
+            ctx.fillStyle = '#fff'; ctx.font = `bold ${dynFont}px "Roboto Mono"`; ctx.shadowColor = '#000'; ctx.shadowBlur = Math.max(2, 4 * zoom);
+            ctx.fillText(obj.name, obj.p.x + dynRadius + 2, obj.p.y + (dynRadius / 2)); ctx.shadowBlur = 0;
+        }
+    });
+
+    requestAnimationFrame(renderLoop);
+}
+
+</script>
+</body>
+</html>

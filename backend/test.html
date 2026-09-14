@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Brown GP | CodePen Sandbox</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Titillium+Web:wght@300;400;600;700;900&family=Roboto+Mono:wght@400;500;700&display=swap');
+
+:root {
+    --red: #e10600; --bg: #080a0e; --surface: #0e1117; --surface2: #13161f; --surface3: #1a1d28;
+    --border: #1e2230; --border2: #252838; --text: #f0f0f0; --text-dim: #6b7280; --text-mid: #9ca3af;
+    --green: #00d2be; --yellow: #ffe600;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: var(--bg); color: var(--text); font-family: 'Titillium Web', sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+.top-bar { position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--red); z-index: 100; }
+
+.header { padding: 20px 20px 15px; border-bottom: 1px solid var(--border); flex-shrink: 0; display: flex; justify-content: space-between; align-items: flex-end; }
+.header-left .eyebrow { font-family: 'Roboto Mono', monospace; font-size: 10px; letter-spacing: 3px; color: var(--yellow); text-transform: uppercase; margin-bottom: 4px; }
+.header-left h1 { font-size: 24px; font-weight: 900; letter-spacing: -0.5px; line-height: 1; }
+
+.controls { display: flex; gap: 10px; }
+button {
+    background: var(--red); color: white; border: none;
+    padding: 10px 20px; border-radius: 4px; font-family: 'Roboto Mono', monospace;
+    font-size: 12px; font-weight: 700; cursor: pointer; transition: transform 0.1s, background 0.2s; text-transform: uppercase;
+}
+button:hover { background: #ff1a1a; }
+button:active { transform: scale(0.98); }
+button.secondary { background: var(--surface3); border: 1px solid var(--border2); color: var(--text); }
+button.secondary:hover { background: var(--border); }
+
+.workspace { display: flex; flex: 1; overflow: hidden; flex-direction: column; }
+@media (min-width: 800px) { .workspace { flex-direction: row; } }
+
+.editor-pane, .render-pane { flex: 1; display: flex; flex-direction: column; }
+.editor-pane { border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+@media (min-width: 800px) { .editor-pane { border-bottom: none; } }
+
+.pane-label { background: var(--surface2); padding: 8px 16px; font-family: 'Roboto Mono', monospace; font-size: 10px; color: var(--text-mid); border-bottom: 1px solid var(--border); text-transform: uppercase; letter-spacing: 2px; }
+
+textarea {
+    flex: 1; background: var(--surface); color: var(--green); padding: 16px;
+    border: none; outline: none; font-family: 'Roboto Mono', monospace; font-size: 13px; resize: none;
+    line-height: 1.5;
+}
+textarea::-webkit-scrollbar { width: 6px; }
+textarea::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+iframe { flex: 1; width: 100%; height: 100%; border: none; background: var(--bg); }
+
+</style>
+</head>
+<body>
+<div class="top-bar"></div>
+
+<div class="header">
+    <div class="header-left">
+        <div class="eyebrow">Local UI Sandbox</div>
+        <h1>Frontend Editor</h1>
+    </div>
+    <div class="controls">
+        <button class="secondary" onclick="resetTemplate()">Reset</button>
+        <button onclick="updateRender()">▶ Render Code</button>
+    </div>
+</div>
+
+<div class="workspace">
+    <div class="editor-pane">
+        <div class="pane-label">HTML / CSS / JS</div>
+        <textarea id="code-editor" spellcheck="false"></textarea>
+    </div>
+    <div class="render-pane">
+        <div class="pane-label">Live Output</div>
+        <iframe id="render-frame"></iframe>
+    </div>
+</div>
+
+<script>
+    const defaultTemplate = `<!DOCTYPE html>
+<html>
+<head>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Titillium+Web:wght@400;600;700;900&family=Roboto+Mono:wght@500;700&display=swap');
+  
+  :root {
+      --red: #e10600; --bg: #080a0e; --surface: #0e1117; --surface2: #13161f; --surface3: #1a1d28;
+      --border: #1e2230; --border2: #252838; --text: #f0f0f0; --text-dim: #6b7280; --text-mid: #9ca3af;
+      --green: #00d2be; --yellow: #ffe600;
+  }
+  
+  body { background: var(--bg); color: var(--text); font-family: 'Titillium Web', sans-serif; padding: 20px; }
+  
+  /* Shared UI Classes */
+  .col-headers { display: grid; gap: 0; padding: 8px 6px; border-bottom: 2px solid var(--red); background: var(--surface2); }
+  .col-h { font-family: 'Roboto Mono', monospace; font-size: 9px; letter-spacing: 1.5px; color: var(--text-dim); text-transform: uppercase; }
+  
+  .driver-block { border-bottom: 1px solid var(--border); }
+  .driver-row { display: grid; gap: 0; padding: 8px 6px; align-items: center; }
+  
+  .pos-cell { font-family: 'Roboto Mono', monospace; font-size: 13px; font-weight: 700; }
+  .team-bar { width: 3px; height: 26px; border-radius: 1px; }
+  .drv-cell { font-size: 15px; font-weight: 700; letter-spacing: 0.5px; display: flex; align-items: center; }
+  .gap-cell { font-family: 'Roboto Mono', monospace; font-size: 10px; color: var(--text-mid); }
+  
+  .badge-dsq {
+      background: rgba(225,6,0,0.15); color: var(--red); border: 1px solid rgba(225,6,0,0.3);
+      font-family: 'Roboto Mono', monospace; font-size: 9px; padding: 1px 4px; border-radius: 2px;
+      margin-left: 6px; font-weight: 700;
+  }
+  .elimination-banner { text-align:center; background: rgba(225,6,0,0.15); color: var(--red); font-family: 'Roboto Mono', monospace; font-size: 10px; padding: 4px 0; border-top: 1px solid rgba(225,6,0,0.3); border-bottom: 1px solid rgba(225,6,0,0.3); letter-spacing: 2px; margin: 4px 0;}
+</style>
+</head>
+<body>
+
+  <div style="max-width: 500px; background: var(--surface2); border: 1px solid var(--border2); border-radius: 4px; padding: 16px;">
+      <h3 style="margin-top:0; font-family:'Roboto Mono',monospace; font-size:10px; color:var(--red); text-transform:uppercase; letter-spacing:2px;">Prototype: Sprint Shootout Gaps & DSQ</h3>
+      
+      <div class="col-headers" style="grid-template-columns: 35px 20px 1fr 60px 60px 60px;">
+          <div class="col-h">P</div><div class="col-h"></div><div class="col-h">Driver</div>
+          <div class="col-h" style="text-align:right;padding-right:10px;">Gap</div><div class="col-h">SQ1</div><div class="col-h">SQ2</div>
+      </div>
+      
+      <div id="sandbox-table"></div>
+  </div>
+
+  <script>
+      // Mock data simulating the fixed python extraction
+      const mockData = [
+          { pos: 1, driver: "VER", color: "#3671C6", q1: "1:28.194", q2: "1:27.972", is_dsq: false },
+          { pos: 2, driver: "LEC", color: "#E80020", q1: "1:28.537", q2: "1:28.183", is_dsq: false },
+          { pos: 15, driver: "BOT", color: "#00E701", q1: "1:29.360", q2: "1:29.453", is_dsq: false },
+          { pos: 16, driver: "SAR", color: "#52E252", q1: "1:29.540", q2: "-", is_dsq: false },
+          { pos: 20, driver: "HAD", color: "#52E252", q1: "1:28.941", q2: "1:28.789", is_dsq: true }
+      ];
+
+      function timeToSecs(tStr) {
+          if (!tStr || tStr === '-' || !tStr.includes(':')) return Infinity;
+          let parts = tStr.split(':');
+          return parseInt(parts[0]) * 60 + parseFloat(parts[1]);
+      }
+
+      const container = document.getElementById('sandbox-table');
+      
+      // 1. Calculate absolute best time in the session
+      let bestOverall = Infinity;
+      mockData.forEach(d => {
+          bestOverall = Math.min(bestOverall, timeToSecs(d.q1), timeToSecs(d.q2));
+      });
+
+      mockData.forEach((drv, idx) => {
+          // 2. Drop Zone Injector
+          if (drv.pos === 16) {
+              container.innerHTML += \`<div class="elimination-banner">▼ SQ1 DROP ZONE ▼</div>\`;
+          }
+
+          // 3. Absolute Gap Math & DSQ Handle
+          let gapStr = '-';
+          let bestDriverTime = drv.q2 !== "-" ? timeToSecs(drv.q2) : timeToSecs(drv.q1);
+          
+          if (drv.is_dsq) {
+              gapStr = '<span style="color:var(--red); font-weight:bold;">DSQ</span>';
+          } else if (bestDriverTime !== Infinity && bestOverall !== Infinity && bestDriverTime > bestOverall) {
+              gapStr = '+' + (bestDriverTime - bestOverall).toFixed(3) + 's';
+          } else if (bestDriverTime === bestOverall && bestDriverTime !== Infinity) {
+              gapStr = 'Leader';
+          }
+
+          // 4. Render
+          const driverNameUI = drv.driver + (drv.is_dsq ? '<span class="badge-dsq">DSQ</span>' : '');
+
+          container.innerHTML += \`
+              <div class="driver-block">
+                  <div class="driver-row" style="grid-template-columns: 35px 20px 1fr 60px 60px 60px;">
+                      <div class="pos-cell">${drv.pos}</div>
+                      <div class="team-bar" style="background:${drv.color};"></div>
+                      <div class="drv-cell">${driverNameUI}</div>
+                      <div class="gap-cell" style="text-align:right; padding-right:10px;">${gapStr}</div>
+                      <div class="gap-cell">\${drv.q1}</div>
+                      <div class="gap-cell" style="color:var(--yellow); font-weight:700;">\${drv.q2}</div>
+                  </div>
+              </div>\`;
+      });
+  <\/script>
+</body>
+</html>`;
+
+    function updateRender() {
+        const code = document.getElementById('code-editor').value;
+        const iframe = document.getElementById('render-frame');
+        const doc = iframe.contentWindow.document;
+        
+        doc.open();
+        doc.write(code);
+        doc.close();
+    }
+
+    function resetTemplate() {
+        document.getElementById('code-editor').value = defaultTemplate;
+        updateRender();
+    }
+
+    // Initialize on load
+    window.onload = resetTemplate;
+</script>
+</body>
+</html>
