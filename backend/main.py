@@ -623,14 +623,110 @@ async def get_season_data():
         payloads = await asyncio.gather(*[_fetch_remote_json(session, url) for url in urls.values()])
     return JSONResponse(dict(zip(urls.keys(), payloads)))
 
+def _season_alpha_items(payload):
+    if isinstance(payload, list):
+        return payload
+    if not isinstance(payload, dict):
+        return []
+    for key in ("results", "data", "items"):
+        value = payload.get(key)
+        if isinstance(value, list):
+            return value
+    return []
+
+
+def _season_alpha_round_id(schedule_payload, round_number: int):
+    for item in _season_alpha_items(schedule_payload):
+        if not isinstance(item, dict):
+            continue
+        candidate = item.get("round") or item.get("round_number")
+        if isinstance(candidate, dict):
+            candidate = candidate.get("number") or candidate.get("round_number")
+        try:
+            if int(candidate) != int(round_number):
+                continue
+        except (TypeError, ValueError):
+            continue
+        round_id = item.get("round_id") or item.get("id")
+        if isinstance(round_id, dict):
+            round_id = round_id.get("id")
+        if round_id:
+            return str(round_id)
+    return None
+
+
+def _season_alpha_sprint_quali_to_ergast(payload, round_number: int):
+    rows = []
+    for position, item in enumerate(_season_alpha_items(payload), start=1):
+        if not isinstance(item, dict):
+            continue
+        driver = item.get("driver") or {}
+        team = item.get("team") or item.get("constructor") or {}
+        result_position = item.get("position") or item.get("rank") or position
+        code = driver.get("code") or driver.get("abbreviation") or driver.get("driver_code") or ""
+        q1 = item.get("q1") or item.get("Q1")
+        q2 = item.get("q2") or item.get("Q2")
+        q3 = item.get("q3") or item.get("Q3")
+        if not (q1 or q2 or q3):
+            times = item.get("times") or item.get("session_times") or []
+            if isinstance(times, list):
+                values = []
+                for value in times[:3]:
+                    if isinstance(value, dict):
+                        value = value.get("time") or value.get("value")
+                    values.append(value)
+                q1 = values[0] if len(values) > 0 else None
+                q2 = values[1] if len(values) > 1 else None
+                q3 = values[2] if len(values) > 2 else None
+        fastest = item.get("fastest_time") or item.get("time")
+        if isinstance(fastest, dict):
+            fastest = fastest.get("time") or fastest.get("value")
+        rows.append({
+            "position": str(result_position),
+            "Driver": {
+                "driverId": driver.get("ergast_id") or driver.get("id") or "",
+                "code": code,
+                "givenName": driver.get("given_name") or driver.get("givenName") or "",
+                "familyName": driver.get("family_name") or driver.get("familyName") or "",
+            },
+            "Constructor": {
+                "constructorId": team.get("ergast_id") or team.get("id") or "",
+                "name": team.get("name") or team.get("team_name") or "",
+            },
+            "Q1": q1 or fastest or "",
+            "Q2": q2 or "",
+            "Q3": q3 or "",
+        })
+    return {
+        "MRData": {
+            "RaceTable": {
+                "season": "2026",
+                "round": str(round_number),
+                "Races": [{"season": "2026", "round": str(round_number), "SprintQualifyingResults": rows}],
+            }
+        }
+    }
+
+
 @app.get("/api/season-results")
 async def get_season_results(round: int, session: str = "results"):
     allowed = {"results", "qualifying", "sprint", "sprintQualifying"}
     if session not in allowed:
         return JSONResponse({"MRData": {"RaceTable": {"Races": []}}}, status_code=400)
-    url = f"https://api.jolpi.ca/ergast/f1/current/{round}/{session}.json?limit=100"
     timeout = aiohttp.ClientTimeout(total=20)
     async with aiohttp.ClientSession(timeout=timeout) as http_session:
+        if session == "sprintQualifying":
+            schedule = await _fetch_remote_json(
+                http_session, "https://api.jolpi.ca/f1/alpha/schedules/2026/"
+            )
+            round_id = _season_alpha_round_id(schedule, round)
+            if not round_id:
+                return JSONResponse({"MRData": {"RaceTable": {"Races": []}}})
+            payload = await _fetch_remote_json(
+                http_session, f"https://api.jolpi.ca/f1/alpha/results/{round_id}/SQ/"
+            )
+            return JSONResponse(_season_alpha_sprint_quali_to_ergast(payload, round))
+        url = f"https://api.jolpi.ca/ergast/f1/current/{round}/{session}.json?limit=100"
         payload = await _fetch_remote_json(http_session, url)
     return JSONResponse(payload)
 
