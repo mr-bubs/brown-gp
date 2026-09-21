@@ -13,7 +13,7 @@
   <style>
     :root{--bg:#08090b;--panel:#111317;--panel2:#171a20;--line:#292d35;--muted:#939aa6;--text:#f4f6f8;--red:#f0141e;--red2:#b80e16;--green:#32d583;--amber:#ffbf47;--team:#00d7b6;--radius:20px;--shadow:0 18px 50px rgba(0,0,0,.25)}
     *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:radial-gradient(circle at 88% -5%,rgba(240,20,30,.14),transparent 30%),var(--bg);color:var(--text);font:16px/1.45 Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;min-height:100vh}button,select{font:inherit}button{color:inherit}a{color:inherit}.shell{max-width:1480px;margin:auto;padding:0 30px 64px}
-    header{height:78px;display:flex;align-items:center;gap:28px;border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(8,9,11,.88);backdrop-filter:blur(18px);z-index:20}.brand{display:flex;align-items:center;gap:12px;font-weight:900;letter-spacing:-.04em;font-size:1.18rem}.brandmark{width:38px;height:24px;background:var(--red);clip-path:polygon(0 0,100% 0,73% 100%,47% 100%,63% 38%,24% 38%,13% 100%,0 100%)}.year{font-weight:650;color:#c3c8d0;font-size:.86rem;padding:6px 10px;background:var(--panel2);border:1px solid var(--line);border-radius:99px}.nav{display:flex;gap:4px;margin-left:auto}.nav button,.seg button,.session-tabs button{border:0;background:transparent;padding:10px 14px;border-radius:10px;color:var(--muted);font-weight:750;cursor:pointer}.nav button:hover,.nav button.active,.session-tabs button.active{background:var(--panel2);color:#fff}.sync{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:.78rem;white-space:nowrap}.sync-dot{width:8px;height:8px;background:var(--green);border-radius:50%;box-shadow:0 0 0 5px rgba(50,213,131,.09)}
+    header{height:78px;display:flex;align-items:center;gap:28px;border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(8,9,11,.88);backdrop-filter:blur(18px);z-index:20}.brand{display:flex;align-items:center;gap:12px;font-weight:900;letter-spacing:-.04em;font-size:1.18rem}.brandmark{width:38px;height:24px;background:var(--red);clip-path:polygon(0 0,100% 0,73% 100%,47% 100%,63% 38%,24% 38%,13% 100%,0 100%)}.brandtext{display:flex;flex-direction:column;line-height:.95}.brandhome{text-decoration:none}.brandhome:hover{text-decoration:underline;text-underline-offset:3px}.brandpage{font-size:.78rem;letter-spacing:.04em;color:#c3c8d0;margin-top:4px}.year{font-weight:650;color:#c3c8d0;font-size:.86rem;padding:6px 10px;background:var(--panel2);border:1px solid var(--line);border-radius:99px}.nav{display:flex;gap:4px;margin-left:auto}.nav button,.seg button,.session-tabs button{border:0;background:transparent;padding:10px 14px;border-radius:10px;color:var(--muted);font-weight:750;cursor:pointer}.nav button:hover,.nav button.active,.session-tabs button.active{background:var(--panel2);color:#fff}.sync{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:.78rem;white-space:nowrap}.sync-dot{width:8px;height:8px;background:var(--green);border-radius:50%;box-shadow:0 0 0 5px rgba(50,213,131,.09)}
     main{padding-top:30px}.view{display:none}.view.active{display:block}.eyebrow{text-transform:uppercase;letter-spacing:.14em;font-weight:850;font-size:.74rem;color:#adb3bc}.hero{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(340px,.7fr);gap:18px;margin-bottom:20px}.race-hero{min-height:310px;border-radius:26px;overflow:hidden;padding:30px;position:relative;background:linear-gradient(120deg,rgba(5,7,10,.2),rgba(5,7,10,.96) 76%),radial-gradient(circle at 18% 25%,#334553 0,transparent 26%),linear-gradient(140deg,#26333e,#101216 65%);border:1px solid #303640;box-shadow:var(--shadow)}.race-hero:before{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.026) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.026) 1px,transparent 1px);background-size:28px 28px;mask-image:linear-gradient(90deg,#000,transparent 80%)}.track{position:absolute;right:25px;top:24px;width:43%;height:76%;opacity:.34}.race-copy{position:relative;z-index:1;max-width:58%;height:100%;display:flex;flex-direction:column}.race-round{color:var(--red);font-weight:900;letter-spacing:.1em;font-size:.78rem}.race-title{font-size:clamp(2.2rem,4vw,4.6rem);line-height:.9;letter-spacing:-.065em;margin:17px 0 12px;font-weight:950}.race-place{color:#c5cad1}.countdown{margin-top:auto;display:flex;gap:22px}.count-unit b{display:block;font-size:1.42rem}.count-unit span{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.1em}
     .leaders{background:var(--panel);border:1px solid var(--line);border-radius:26px;padding:24px;display:flex;flex-direction:column}.section-head{display:flex;align-items:end;justify-content:space-between;gap:16px;margin-bottom:17px}.section-head h2{font-size:1.35rem;letter-spacing:-.03em;margin:4px 0 0}.mini-link{border:0;background:none;color:#bdc3cc;font-weight:700;cursor:pointer}.leader-row{display:grid;grid-template-columns:42px 1fr auto;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--line)}.leader-row:first-of-type{border-top:0}.leader-pos{font-size:1.7rem;font-weight:950;color:#5f6672}.leader-row:first-of-type .leader-pos{color:var(--red)}.leader-name{font-weight:850}.leader-team{font-size:.76rem;color:var(--muted)}.leader-points{text-align:right;font-size:1.26rem;font-weight:900}.leader-points small{display:block;font-size:.65rem;color:var(--muted);font-weight:700;letter-spacing:.08em}
     .grid{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(360px,.82fr);gap:18px}.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:24px}.seg{display:flex;background:#0b0d10;border:1px solid var(--line);padding:4px;border-radius:12px}.seg button{padding:7px 11px;font-size:.8rem}.seg button.active{background:#2a2f38;color:#fff}.chart-wrap{position:relative;min-height:315px;margin-top:12px}.chart{width:100%;height:315px;overflow:visible}.chart text{fill:#848c98;font-size:11px}.chart .gridline{stroke:#292e37;stroke-width:1}.chart .plot{fill:none;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}.chart-point{cursor:pointer}.tooltip{position:absolute;pointer-events:none;background:#f4f6f8;color:#090a0c;border-radius:10px;padding:8px 10px;font-size:.75rem;font-weight:750;box-shadow:0 8px 24px rgba(0,0,0,.35);opacity:0;transform:translate(-50%,-120%);white-space:nowrap;z-index:3}.legend{display:flex;flex-wrap:wrap;gap:9px 16px;margin-top:10px}.legend-item{display:flex;align-items:center;gap:7px;color:#c7ccd3;font-size:.78rem;font-weight:650}.swatch{width:18px;height:3px;border-radius:5px}
@@ -27,7 +27,7 @@
 <body>
 <div class="shell">
   <header>
-    <div class="brand"><span class="brandmark" aria-hidden="true"></span><span>F1 PITWALL</span></div>
+    <div class="brand"><span class="brandmark" aria-hidden="true"></span><span class="brandtext"><a class="brandhome" href="/">BrownGP</a><span class="brandpage">Pit Wall</span></span></div>
     <span class="year">2026 SEASON</span>
     <nav class="nav" aria-label="Dashboard views">
       <button class="active" data-view="overview">Overview</button><button data-view="results">Results</button><button data-view="calendar">Calendar</button>
@@ -57,27 +57,6 @@
   </main>
   <footer><span>Live timing is not included. Session and championship data updates after official classification.</span><span>Data: Jolpica F1 & OpenF1 · Unofficial fan dashboard</span></footer>
 </div>
-<script>
-(function(){
-  function showBrownGpJsError(message){
-    var box=document.getElementById('brownGpJsError');
-    if(!box){
-      box=document.createElement('div');
-      box.id='brownGpJsError';
-      box.style.cssText='position:fixed;left:8px;right:8px;bottom:8px;z-index:99999;background:#2b090b;color:#fff;border:1px solid #f0141e;border-radius:8px;padding:10px;font:12px/1.4 monospace;white-space:pre-wrap;max-height:38vh;overflow:auto';
-      document.body.appendChild(box);
-    }
-    box.textContent='SEASON JS ERROR\n'+message;
-  }
-  window.addEventListener('error',function(e){
-    showBrownGpJsError((e.message||'Unknown error')+'\n'+(e.filename||'')+':'+(e.lineno||'?')+':'+(e.colno||'?'));
-  });
-  window.addEventListener('unhandledrejection',function(e){
-    var reason=e.reason;
-    showBrownGpJsError('Unhandled promise rejection\n'+(reason&&reason.stack?reason.stack:String(reason)));
-  });
-})();
-</script>
 <script>
 const API='https://api.jolpi.ca/ergast/f1/current';
 const colors={mercedes:'#00d7b6',ferrari:'#ed1131',mclaren:'#f47600',red_bull:'#4781d7',rb:'#6c98ff',alpine:'#00a1e8',haas:'#b6babd',audi:'#f50537',williams:'#1868db',aston_martin:'#229971',cadillac:'#909090'};
