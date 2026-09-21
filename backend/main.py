@@ -669,31 +669,50 @@ def _season_alpha_round_id(schedule_payload, round_number: int):
 
 
 def _season_alpha_sprint_quali_to_ergast(payload, round_number: int):
+    def _alpha_time(value):
+        if isinstance(value, dict):
+            value = value.get("time") or value.get("value")
+        return value or ""
+
     rows = []
     for position, item in enumerate(_season_alpha_items(payload), start=1):
         if not isinstance(item, dict):
             continue
+
         driver = item.get("driver") or {}
         team = item.get("team") or item.get("constructor") or {}
-        result_position = item.get("position") or item.get("rank") or position
+
+        # Alpha SQ results store the classification/times inside a
+        # per-driver "components" entry rather than on the driver wrapper.
+        components = item.get("components") or []
+        component = {}
+        if isinstance(components, list):
+            component = next((value for value in components if isinstance(value, dict)), {})
+        elif isinstance(components, dict):
+            component = components
+
+        result_position = (
+            component.get("position")
+            or component.get("position_text")
+            or item.get("position")
+            or item.get("rank")
+            or position
+        )
         code = driver.get("code") or driver.get("abbreviation") or driver.get("driver_code") or ""
-        q1 = item.get("q1") or item.get("Q1")
-        q2 = item.get("q2") or item.get("Q2")
-        q3 = item.get("q3") or item.get("Q3")
+
+        q1 = _alpha_time(component.get("SQ1") or component.get("sq1") or item.get("SQ1") or item.get("q1"))
+        q2 = _alpha_time(component.get("SQ2") or component.get("sq2") or item.get("SQ2") or item.get("q2"))
+        q3 = _alpha_time(component.get("SQ3") or component.get("sq3") or item.get("SQ3") or item.get("q3"))
+
         if not (q1 or q2 or q3):
-            times = item.get("times") or item.get("session_times") or []
+            times = component.get("times") or item.get("times") or item.get("session_times") or []
             if isinstance(times, list):
-                values = []
-                for value in times[:3]:
-                    if isinstance(value, dict):
-                        value = value.get("time") or value.get("value")
-                    values.append(value)
-                q1 = values[0] if len(values) > 0 else None
-                q2 = values[1] if len(values) > 1 else None
-                q3 = values[2] if len(values) > 2 else None
-        fastest = item.get("fastest_time") or item.get("time")
-        if isinstance(fastest, dict):
-            fastest = fastest.get("time") or fastest.get("value")
+                values = [_alpha_time(value) for value in times[:3]]
+                q1 = values[0] if len(values) > 0 else ""
+                q2 = values[1] if len(values) > 1 else ""
+                q3 = values[2] if len(values) > 2 else ""
+
+        fastest = _alpha_time(component.get("fastest_time") or component.get("time") or item.get("fastest_time") or item.get("time"))
         rows.append({
             "position": str(result_position),
             "Driver": {
@@ -710,6 +729,7 @@ def _season_alpha_sprint_quali_to_ergast(payload, round_number: int):
             "Q2": q2 or "",
             "Q3": q3 or "",
         })
+
     return {
         "MRData": {
             "RaceTable": {
