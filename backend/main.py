@@ -559,6 +559,10 @@ def read_root():
 @app.get("/session-timing")
 def read_session_timing():
    with open("index.html", "r") as f: return HTMLResponse(content=f.read())
+@app.get("/season")
+def read_season():
+   with open("season.html", "r", encoding="utf-8") as f: return HTMLResponse(content=f.read())
+
 @app.get("/replay")
 def read_replay():
    with open("replay.html", "r") as f: return HTMLResponse(content=f.read())
