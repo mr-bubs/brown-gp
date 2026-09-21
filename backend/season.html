@@ -58,6 +58,27 @@
   <footer><span>Live timing is not included. Session and championship data updates after official classification.</span><span>Data: Jolpica F1 & OpenF1 · Unofficial fan dashboard</span></footer>
 </div>
 <script>
+(function(){
+  function showBrownGpJsError(message){
+    var box=document.getElementById('brownGpJsError');
+    if(!box){
+      box=document.createElement('div');
+      box.id='brownGpJsError';
+      box.style.cssText='position:fixed;left:8px;right:8px;bottom:8px;z-index:99999;background:#2b090b;color:#fff;border:1px solid #f0141e;border-radius:8px;padding:10px;font:12px/1.4 monospace;white-space:pre-wrap;max-height:38vh;overflow:auto';
+      document.body.appendChild(box);
+    }
+    box.textContent='SEASON JS ERROR\n'+message;
+  }
+  window.addEventListener('error',function(e){
+    showBrownGpJsError((e.message||'Unknown error')+'\n'+(e.filename||'')+':'+(e.lineno||'?')+':'+(e.colno||'?'));
+  });
+  window.addEventListener('unhandledrejection',function(e){
+    var reason=e.reason;
+    showBrownGpJsError('Unhandled promise rejection\n'+(reason&&reason.stack?reason.stack:String(reason)));
+  });
+})();
+</script>
+<script>
 const API='https://api.jolpi.ca/ergast/f1/current';
 const colors={mercedes:'#00d7b6',ferrari:'#ed1131',mclaren:'#f47600',red_bull:'#4781d7',rb:'#6c98ff',alpine:'#00a1e8',haas:'#b6babd',audi:'#f50537',williams:'#1868db',aston_martin:'#229971',cadillac:'#909090'};
 const lineColors=['#f0141e','#00d7b6','#f47600','#65a2ff','#ffd24d','#bf80ff','#43d17c','#ff70b7','#b9c0c9','#a87952'];
