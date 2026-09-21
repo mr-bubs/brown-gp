@@ -38,6 +38,33 @@ if not os.path.exists('replay_cache'): os.makedirs('replay_cache')
 
 fastf1.Cache.enable_cache('f1cache')
 
+TRACK_MAP_CACHE = {}
+
+def _get_track_map(event: str, year: int) -> dict:
+    cache_key = f"{year}_{event}"
+    if cache_key in TRACK_MAP_CACHE:
+        return TRACK_MAP_CACHE[cache_key]
+
+    # An upcoming race has no current-year telemetry yet, so try recent editions.
+    for event_year in range(year, max(year - 4, 2020), -1):
+        try:
+            session = fastf1.get_session(event_year, event, 'R')
+            session.load(telemetry=True, laps=True, weather=False, messages=False)
+            fastest_lap = session.laps.pick_fastest()
+            telemetry = fastest_lap.get_telemetry()[['X', 'Y']].dropna()
+            if telemetry.empty:
+                continue
+            stride = max(1, len(telemetry) // 360)
+            points = [[round(float(row.X), 1), round(float(row.Y), 1)]
+                      for _, row in telemetry.iloc[::stride].iterrows()]
+            result = {"points": points, "source_year": event_year}
+            TRACK_MAP_CACHE[cache_key] = result
+            return result
+        except Exception:
+            continue
+
+    return {"points": [], "source_year": None}
+
 LIVE_DATA = {
     "SessionInfo": {}, "TimingData": {}, "TimingAppData": {},
     "Position": {}, "RaceControlMessages": {"Messages": []}, "DriverList": {}
@@ -572,6 +599,10 @@ def read_mapper():
 @app.get("/test")
 def read_test():
    with open("test.html", "r") as f: return HTMLResponse(content=f.read())
+
+@app.get("/api/track-map")
+async def get_track_map(event: str, year: int = 2026):
+    return JSONResponse(await asyncio.to_thread(_get_track_map, event, year))
 
 @app.get("/api/session")
 def get_session(): 
