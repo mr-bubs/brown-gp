@@ -600,6 +600,41 @@ def read_mapper():
 def read_test():
    with open("test.html", "r") as f: return HTMLResponse(content=f.read())
 
+async def _fetch_remote_json(session, url: str) -> dict:
+    try:
+        async with session.get(url, headers={"User-Agent": "BrownGP/1.0"}) as response:
+            if response.status != 200:
+                return {}
+            return await response.json(content_type=None)
+    except Exception:
+        return {}
+
+@app.get("/api/season-data")
+async def get_season_data():
+    urls = {
+        "drivers": "https://api.jolpi.ca/ergast/f1/current/driverStandings.json",
+        "constructors": "https://api.jolpi.ca/ergast/f1/current/constructorStandings.json",
+        "schedule": "https://api.jolpi.ca/ergast/f1/current.json?limit=100",
+        "headshots": "https://api.openf1.org/v1/drivers?session_key=latest",
+        "results": "https://api.jolpi.ca/ergast/f1/current/results.json?limit=2000",
+        "sprints": "https://api.jolpi.ca/ergast/f1/current/sprint.json?limit=1000",
+    }
+    timeout = aiohttp.ClientTimeout(total=25)
+    async with aiohttp.ClientSession(timeout=timeout) as session:
+        payloads = await asyncio.gather(*[_fetch_remote_json(session, url) for url in urls.values()])
+    return JSONResponse(dict(zip(urls.keys(), payloads)))
+
+@app.get("/api/season-results")
+async def get_season_results(round: int, session: str = "results"):
+    allowed = {"results", "qualifying", "sprint", "sprintQualifying"}
+    if session not in allowed:
+        return JSONResponse({"MRData": {"RaceTable": {"Races": []}}}, status_code=400)
+    url = f"https://api.jolpi.ca/ergast/f1/current/{round}/{session}.json?limit=100"
+    timeout = aiohttp.ClientTimeout(total=20)
+    async with aiohttp.ClientSession(timeout=timeout) as http_session:
+        payload = await _fetch_remote_json(http_session, url)
+    return JSONResponse(payload)
+
 @app.get("/api/track-map")
 async def get_track_map(event: str, year: int = 2026):
     return JSONResponse(await asyncio.to_thread(_get_track_map, event, year))
