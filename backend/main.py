@@ -628,10 +628,18 @@ def _season_alpha_items(payload):
         return payload
     if not isinstance(payload, dict):
         return []
-    for key in ("results", "data", "items"):
+    for key in ("results", "items", "events"):
         value = payload.get(key)
         if isinstance(value, list):
             return value
+    data = payload.get("data")
+    if isinstance(data, list):
+        return data
+    if isinstance(data, dict):
+        for key in ("results", "items", "events"):
+            value = data.get(key)
+            if isinstance(value, list):
+                return value
     return []
 
 
@@ -639,7 +647,8 @@ def _season_alpha_round_id(schedule_payload, round_number: int):
     for item in _season_alpha_items(schedule_payload):
         if not isinstance(item, dict):
             continue
-        candidate = item.get("round") or item.get("round_number")
+        round_info = item.get("round")
+        candidate = round_info if round_info is not None else item.get("round_number")
         if isinstance(candidate, dict):
             candidate = candidate.get("number") or candidate.get("round_number")
         try:
@@ -647,7 +656,11 @@ def _season_alpha_round_id(schedule_payload, round_number: int):
                 continue
         except (TypeError, ValueError):
             continue
-        round_id = item.get("round_id") or item.get("id")
+        round_id = None
+        if isinstance(round_info, dict):
+            round_id = round_info.get("id")
+        if not round_id:
+            round_id = item.get("round_id") or item.get("id")
         if isinstance(round_id, dict):
             round_id = round_id.get("id")
         if round_id:
