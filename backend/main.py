@@ -28,6 +28,9 @@ app = FastAPI()
 # Mount the F1_Frames directory for the landing page
 app.mount("/F1_Frames", StaticFiles(directory="F1_Frames"), name="frames")
 
+# Mount shared Brown GP brand assets
+app.mount("/assets", StaticFiles(directory="../assets"), name="assets")
+
 app.add_middleware(
     CORSMiddleware, allow_origins=["*"], allow_credentials=True,
     allow_methods=["*"], allow_headers=["*"],
