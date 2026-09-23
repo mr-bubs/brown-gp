@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Brown GP</title>
-    <link rel="icon" type="image/png" href="/assets/bgp-favicon.png">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Titillium+Web:wght@300;400;600;700;900&family=Roboto+Mono:wght@400;500;700&display=swap');
 
@@ -54,7 +53,8 @@
             transition: opacity 0.6s ease, visibility 0.6s ease;
         }
         #loader.hidden { opacity: 0; visibility: hidden; }
-        .loader-logo { width: min(360px, 72vw); height: auto; display: block; }
+        .loader-logo { font-size: 54px; font-weight: 900; letter-spacing: -1px; line-height: 1; color: var(--red); text-transform: uppercase; }
+        .loader-logo span { color: white; }
         .loader-pct { font-family: 'Roboto Mono', monospace; font-size: 11px; letter-spacing: 2px; color: var(--text-dim); text-transform: uppercase; animation: pulse 1.5s infinite; }
 
         /* ─── HAMBURGER & MENUS ─── */
@@ -125,8 +125,8 @@
         .badge-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--red); animation: pulse 2s ease-in-out infinite; }
         @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.35;transform:scale(0.7)} }
         
-        .logo { width: min(420px, 78vw); height: auto; display: block; margin: 0 auto 8px; }
-        .footer-logo { width: 190px; height: auto; display: block; }
+        .logo { font-size: 54px; font-weight: 900; letter-spacing: -1px; line-height: 1; color: var(--red); text-transform: uppercase; margin-bottom: 8px; }
+        .logo span { color: white; }
         .subtitle { font-family: 'Roboto Mono', monospace; font-size: 12px; letter-spacing: 6px; color: rgba(255,255,255,0.9); text-transform: uppercase; }
 
         .hero-scroll-hint {
@@ -195,7 +195,7 @@
 <body>
 
     <div id="loader">
-        <img class="loader-logo" src="/assets/browngp-logo.png" alt="Brown GP">
+        <div class="loader-logo">Brown<span>GP</span></div>
         <div class="loader-pct" id="loader-pct">Initiating Telemetry... 0%</div>
     </div>
 
@@ -244,7 +244,7 @@
         <section class="hero" id="hero-block">
             <div class="header">
                 <div class="season-badge"><div class="badge-dot"></div>2026 Season</div>
-                <img class="logo" src="/assets/browngp-logo.png" alt="Brown GP">
+                <div class="logo">Brown<span>GP</span></div>
                 <div class="subtitle">F1 Telemetry & Replay</div>
             </div>
             
@@ -303,7 +303,7 @@
             </div>
 
             <div class="footer-bar">
-                <img class="footer-logo" src="/assets/browngp-logo.png" alt="Brown GP">
+                <div class="logo" style="font-size:32px; margin:0; text-shadow:none;">Brown<span>GP</span></div>
                 <div class="footer-copy">
                     This website is unofficial and is not associated in any way with the Formula 1 companies. F1, FORMULA ONE, FORMULA 1, FIA FORMULA ONE WORLD CHAMPIONSHIP, GRAND PRIX and related marks are trade marks of Formula One Licensing B.V.
                 </div>
