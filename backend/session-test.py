@@ -13,8 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-REPO_ROOT = os.path.dirname(SCRIPT_DIR)
-SESSION_HTML = os.path.join(REPO_ROOT, 'session-timing', 'index.html')
+SESSION_HTML = os.path.join(SCRIPT_DIR, 'index.html')
 CAPTURE_SCRIPT = os.path.join(SCRIPT_DIR, 'f1-auth-capture.py')
 CAPTURE_DIR = os.path.join(SCRIPT_DIR, 'f1-captures')
 
