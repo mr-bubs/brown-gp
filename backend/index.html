@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Brown GP Session Timing</title>
+<link rel="icon" type="image/png" href="/assets/bgp-favicon.png">
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Titillium+Web:wght@300;400;600;700;900&family=Roboto+Mono:wght@400;500;700&display=swap');
 
@@ -25,6 +26,9 @@ body { background: var(--bg); color: var(--text); font-family: 'Titillium Web', 
 
 .page-header { position: sticky; top: 3px; background: var(--surface2); border-bottom: 1px solid var(--border2); padding: 14px 16px 12px; z-index: 50; }
 .header-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.header-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.header-brand { width: 84px; height: auto; display: block; flex-shrink: 0; }
+.header-session { min-width: 0; }
 .session-eyebrow { font-family: 'Roboto Mono', monospace; font-size: 9px; letter-spacing: 3px; color: var(--red); text-transform: uppercase; margin-bottom: 3px; }
 #session-name { font-size: 18px; font-weight: 900; letter-spacing: -0.3px; line-height: 1.1; }
 .header-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
@@ -157,8 +161,11 @@ body { background: var(--bg); color: var(--text); font-family: 'Titillium Web', 
 <div class="page-header">
     <div class="header-top">
         <div class="header-left">
-            <div class="session-eyebrow" id="header-eyebrow">Live Session</div>
-            <div id="session-name"></div>
+            <a href="/" aria-label="Brown GP Home"><img class="header-brand" src="/assets/bgp-logo.png" alt="BGP"></a>
+            <div class="header-session">
+                <div class="session-eyebrow" id="header-eyebrow">Live Session</div>
+                <div id="session-name"></div>
+            </div>
         </div>
         <div class="header-right">
             <div class="live-badge" id="live-badge-ui"><div class="live-dot"></div>LIVE</div>
