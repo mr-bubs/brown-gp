@@ -94,3 +94,6 @@ Thumbs.db
 *.tar.gz
 *.tgz
 *.zip
+
+# LANDING-002 mobile frame benchmark assets
+backend/F1_Frames_LANDING002/
