@@ -95,26 +95,23 @@
       async function run(){
         if(!mobile){finishIfReady();return;}
         try{
-          // Deliberately load every frame in numerical order, regardless of speed.
-          // The dashboard is already loading in the iframe, but cannot appear early.
-          for(let i=0;i<COUNT;i++){
-            const url=await loadFrame(i);
-            frames.push(url);
-            if(i===0)await showFrame(url);
-            label.textContent='LOADING DATA · '+(i+1)+' / '+COUNT;
-          }
-          // Only begin the cinematic after the complete sequence is available.
-          label.textContent='LOADING DATA';
+          // Stream frames in order. Display each one as soon as it is downloaded
+          // and decoded, without waiting for the remaining frames.
           for(let i=0;i<COUNT;i++){
             const start=performance.now();
-            await showFrame(frames[i]);
+            const url=await loadFrame(i);
+            frames.push(url);
+            await showFrame(url);
+            label.textContent='LOADING DATA · '+(i+1)+' / '+COUNT;
+            // Allow a real paint opportunity and a minimum 16 FPS frame interval.
             await wait(Math.max(0,FRAME_MS-(performance.now()-start)));
           }
           animationDone=true;
+          label.textContent='LOADING DATA';
           finishIfReady();
         }catch(error){
           console.error('LANDING-002 frame loading failed:',error);
-          // Missing/broken frames should not permanently block the dashboard.
+          // Preserve the existing error fallback; never trap a visitor.
           animationDone=true;
           label.textContent='LOADING DATA';
           finishIfReady();
