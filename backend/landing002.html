@@ -141,7 +141,7 @@
             }
           };
           await Promise.all(Array.from({length:8},worker));
-          if(failed||dashboardFailed||blobs.some(x=>!x)){
+          if(failed||dashboardFailed||decisionMade||dismissed||blobs.some(x=>!x)){
             decisionMade=true;revealIfReady();return;
           }
           await play();
@@ -150,7 +150,7 @@
         }
       }
       // Even if a network request hangs, the loader will not hold ready data indefinitely.
-      setTimeout(()=>{if(!decisionMade){decisionMade=true;revealIfReady();}},MAX_PRELOAD_MS+1000);
+      setTimeout(()=>{if(!decisionMade){decisionMade=true;controller.abort();revealIfReady();}},MAX_PRELOAD_MS+1000);
       run();
     })();
   </script>
