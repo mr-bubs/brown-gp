@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="theme-color" content="#08090b" />
+  <meta name="theme-color" content="#0B0C0C" />
   <meta name="description" content="A live Formula 1 season dashboard for standings, points progression, session results and the race calendar." />
   <title>Brown GP — 2026 Season</title>
   <link rel="preconnect" href="https://api.jolpi.ca" />
@@ -34,6 +34,57 @@
     #bgp-brand.visible{opacity:1}
     #bgp-brand img{width:min(78vw,440px);height:auto;filter:drop-shadow(0 5px 22px rgba(0,0,0,.5))}
     @media(prefers-reduced-motion:reduce){#bgp-car,#bgp-brand{transition-duration:.15s}}
+  </style>
+
+  <style>
+    /* BRAND-002: Brown GP visual identity. Dashboard-only presentation.
+       Team series colours, car imagery and all data logic remain untouched. */
+    :root{
+      --bg:#0B0C0C;--panel:#262729;--panel2:#303234;
+      --line:#44413c;--muted:#b6aa9b;--text:#F1E5D3;
+      --red:#C71F32;--red2:#8f1825;--green:#064638;
+      --amber:#D6B58A;--brand-gold:#D6B58A;--brand-green:#064638;
+    }
+    body{background:var(--bg);color:var(--text)}
+    header{background:rgba(11,12,12,.94);border-bottom-color:rgba(214,181,138,.25)}
+    .brandpage,.year{color:var(--brand-gold)}
+    .year{background:var(--panel);border-color:var(--line)}
+    .nav button:hover,.nav button.active,.session-tabs button.active{
+      background:var(--brand-gold);color:var(--bg)
+    }
+    .nav button:focus-visible,.seg button:focus-visible,.session-tabs button:focus-visible,
+    .mini-link:focus-visible,.select:focus-visible{
+      outline:2px solid var(--brand-gold);outline-offset:3px
+    }
+    .eyebrow,.race-round,.round-no{color:var(--brand-gold)}
+    .race-hero{
+      background:linear-gradient(115deg,rgba(11,12,12,.3),rgba(11,12,12,.94) 76%),
+        radial-gradient(circle at 18% 25%,rgba(6,70,56,.65),transparent 42%),
+        linear-gradient(140deg,#12392f,#0B0C0C 70%);
+      border-color:rgba(214,181,138,.3)
+    }
+    .race-place,.mini-link,.gap,.legend-item{color:var(--text)}
+    .section-head h2,.leader-points,.race-title{color:var(--text)}
+    .leader-row:first-of-type .leader-pos{color:var(--brand-gold)}
+    .leader-pos,.pos{color:#a99c89}
+    .leaders,.card,.round-card{background:var(--panel);border-color:var(--line)}
+    .seg{background:var(--bg)}
+    .seg button.active{background:var(--brand-gold);color:var(--bg)}
+    .chart text{fill:#c4b5a2}
+    .chart .gridline{stroke:#514a40}
+    .tooltip{background:var(--text);color:var(--bg)}
+    .standing:hover{background:#303632}
+    .avatar{background:linear-gradient(145deg,#343b35,#1d2421)}
+    .spinner{border-color:#47423b;border-top-color:var(--brand-gold)}
+    .select{background:var(--panel);color:var(--text);border-color:var(--line)}
+    .podium-face,.block{background:#343635}
+    .podium-step.first .block{background:linear-gradient(#b99a70,#755d3f);color:var(--bg)}
+    .round-card.next{border-color:var(--brand-gold);box-shadow:inset 0 0 0 1px rgba(214,181,138,.45)}
+    .badge{border-color:#8c7861;color:var(--text)}
+    .badge.sprint{border-color:var(--red);color:#e9a3ab}
+    footer{border-top-color:rgba(214,181,138,.25);color:var(--muted);align-items:center}
+    footer span{max-width:760px;line-height:1.6}
+    @media(max-width:680px){footer img{margin-bottom:14px}}
   </style>
 </head>
 <body>
