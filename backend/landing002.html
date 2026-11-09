@@ -33,7 +33,7 @@
     <img id="frames" alt="" aria-hidden="true">
     <div class="center">
       <img class="logo" src="/assets/browngp-logo.png" alt="Brown GP">
-      <div class="label">LOADING DATA</div>
+      <div class="label" id="loadingLabel">LOADING DATA</div>
       <div class="error">Season data could not be loaded. <a href="/season">Open Season Dashboard</a> or try again later.</div>
     </div>
   </div>
@@ -43,29 +43,23 @@
       const loader=document.getElementById('loader');
       const dashboard=document.getElementById('dashboard');
       const frameEl=document.getElementById('frames');
+      const label=document.getElementById('loadingLabel');
       const mobile=matchMedia('(max-width:767px)').matches;
-      const reduceMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const COUNT=101;
+      const FRAME_MS=1000/16;
       const frameUrl=i=>'/F1_Webp_LANDING002/frame_'+String(i).padStart(3,'0')+'_delay-0.2s.webp';
-      const COUNT=101, FPS=16, FAST_MBPS=180, MAX_PRELOAD_MS=12000;
-      const blobs=new Array(COUNT), urls=new Array(COUNT);
-      const controller=new AbortController();
-      let dashboardReady=false, dashboardFailed=false, decisionMade=false, cinematic=false, cinematicDone=false, dismissed=false;
-      let lastFrame=0, started=0;
-      const began=performance.now();
-      const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
-      function release(){
-        controller.abort();
-        for(let i=0;i<COUNT;i++){if(urls[i]){URL.revokeObjectURL(urls[i]);urls[i]=null;}blobs[i]=null;}
-      }
+      let dashboardReady=false, dashboardFailed=false, animationDone=!mobile, dismissed=false;
+      const frames=[];
+      const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
       function dismiss(){
         if(dismissed)return;
         dismissed=true;
         loader.classList.add('done');
-        setTimeout(()=>{frameEl.removeAttribute('src');release();loader.remove();},700);
+        setTimeout(()=>{frameEl.removeAttribute('src');frames.forEach(url=>URL.revokeObjectURL(url));loader.remove();},700);
       }
-      function revealIfReady(){
+      function finishIfReady(){
         if(dashboardFailed){loader.classList.add('failed');return;}
-        if(dashboardReady&&decisionMade&&(!cinematic||cinematicDone))dismiss();
+        if(dashboardReady&&animationDone)dismiss();
       }
       function checkDashboard(){
         if(dismissed||dashboardReady||dashboardFailed)return;
@@ -74,83 +68,58 @@
           if(doc){
             const main=doc.getElementById('seasonMain');
             const loading=doc.getElementById('seasonLoading');
-            if(main&&!main.hidden){dashboardReady=true;revealIfReady();return;}
+            if(main&&!main.hidden){dashboardReady=true;finishIfReady();return;}
             if(loading&&loading.textContent.includes('Current season data could not be loaded')){
-              dashboardFailed=true;decisionMade=true;release();revealIfReady();return;
+              dashboardFailed=true;finishIfReady();return;
             }
           }
         }catch(e){}
         setTimeout(checkDashboard,150);
       }
-      dashboard.addEventListener('error',()=>{dashboardFailed=true;decisionMade=true;release();revealIfReady();});
+      dashboard.addEventListener('error',()=>{dashboardFailed=true;finishIfReady();});
       checkDashboard();
-      async function download(i){
-        const response=await fetch(frameUrl(i),{signal:controller.signal,cache:'force-cache'});
+      async function loadFrame(i){
+        const response=await fetch(frameUrl(i),{cache:'force-cache'});
         if(!response.ok)throw new Error('Frame '+i+' HTTP '+response.status);
         const blob=await response.blob();
-        blobs[i]=blob;
-        return blob.size;
+        return URL.createObjectURL(blob);
       }
-      function show(i){
-        if(!urls[i])urls[i]=URL.createObjectURL(blobs[i]);
-        frameEl.src=urls[i];
-      }
-      async function play(){
-        cinematic=true;
-        decisionMade=true;
-        revealIfReady();
-        started=performance.now();
-        function tick(now){
-          if(dismissed||dashboardFailed)return;
-          const index=Math.min(COUNT-1,Math.floor((now-started)*FPS/1000));
-          if(index!==lastFrame){lastFrame=index;show(index);}
-          if(index===COUNT-1&&now-started>=COUNT*1000/FPS){
-            cinematicDone=true;
-            revealIfReady();
-            return;
-          }
-          requestAnimationFrame(tick);
-        }
-        show(0);
-        requestAnimationFrame(tick);
+      function showFrame(url){
+        return new Promise((resolve,reject)=>{
+          const image=new Image();
+          image.onload=()=>{frameEl.src=url;resolve();};
+          image.onerror=()=>reject(new Error('Unable to decode animation frame'));
+          image.src=url;
+        });
       }
       async function run(){
-        if(!mobile||reduceMotion){decisionMade=true;revealIfReady();return;}
+        if(!mobile){finishIfReady();return;}
         try{
-          // First frames are the connection probe, not an unrelated speed-test download.
-          const sampleStart=performance.now();
-          let sampleBytes=0;
-          for(let i=0;i<3;i++){
-            sampleBytes+=await download(i);
-            if(i===0)show(0);
-            if(performance.now()-began>4000)break;
+          // Deliberately load every frame in numerical order, regardless of speed.
+          // The dashboard is already loading in the iframe, but cannot appear early.
+          for(let i=0;i<COUNT;i++){
+            const url=await loadFrame(i);
+            frames.push(url);
+            if(i===0)await showFrame(url);
+            label.textContent='LOADING DATA · '+(i+1)+' / '+COUNT;
           }
-          const elapsed=(performance.now()-sampleStart)/1000;
-          const mbps=sampleBytes*8/Math.max(elapsed,.001)/1e6;
-          if(mbps<FAST_MBPS||blobs.slice(0,3).some(x=>!x)){
-            decisionMade=true;revealIfReady();return;
+          // Only begin the cinematic after the complete sequence is available.
+          label.textContent='LOADING DATA';
+          for(let i=0;i<COUNT;i++){
+            const start=performance.now();
+            await showFrame(frames[i]);
+            await wait(Math.max(0,FRAME_MS-(performance.now()-start)));
           }
-          // A fast link gets a complete cinematic, provided the buffer finishes
-          // within a strict time budget. Never block a slower or unstable visitor.
-          let cursor=3, failed=false;
-          const worker=async()=>{
-            while(!failed&&!dashboardFailed&&performance.now()-began<MAX_PRELOAD_MS){
-              const i=cursor++;
-              if(i>=COUNT)return;
-              try{await download(i);}catch(e){failed=true;return;}
-            }
-          };
-          await Promise.all(Array.from({length:8},worker));
-          if(failed||dashboardFailed||decisionMade||dismissed||blobs.some(x=>!x)){
-            decisionMade=true;revealIfReady();return;
-          }
-          await play();
-        }catch(e){
-          decisionMade=true;revealIfReady();
+          animationDone=true;
+          finishIfReady();
+        }catch(error){
+          console.error('LANDING-002 frame loading failed:',error);
+          // Missing/broken frames should not permanently block the dashboard.
+          animationDone=true;
+          label.textContent='LOADING DATA';
+          finishIfReady();
         }
       }
-      // Even if a network request hangs, the loader will not hold ready data indefinitely.
-      setTimeout(()=>{if(!decisionMade){decisionMade=true;controller.abort();revealIfReady();}},MAX_PRELOAD_MS+1000);
       run();
     })();
   </script>
