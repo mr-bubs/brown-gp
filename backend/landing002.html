@@ -87,7 +87,6 @@
     <nav class="nav" aria-label="Dashboard views">
       <button class="active" data-view="overview">Overview</button><button data-action="session">Session</button><button data-view="results">Results</button><button data-action="ghostlab">GhostLab</button><button data-action="replay">Replay</button><button data-view="calendar">Calendar</button>
     </nav>
-    <div class="sync"><span class="sync-dot"></span><span id="syncLabel">Live data</span></div>
   </header>
   <div id="seasonLoading" class="loading" role="status" aria-live="polite"><div><div class="spinner"></div><span id="seasonLoadingText">Loading current season data…</span></div></div>
   <main id="seasonMain" hidden>
@@ -153,7 +152,6 @@ async function hydrate(){
     S.schedule=liveSchedule;
     (hj||[]).forEach(d=>S.headshots[d.name_acronym]=d);
     $('#roundCount').textContent=S.round;
-    $('#syncLabel').textContent='Updated just now';
     renderLeaders();
     renderStandings();
     renderCalendar();
@@ -162,8 +160,6 @@ async function hydrate(){
     $('#seasonMain').hidden=false;
     $('#seasonLoading').hidden=true;
   }catch(e){
-    $('#syncLabel').textContent='Data unavailable';
-    document.querySelector('.sync-dot').style.background='#ffbf47';
     $('#seasonLoadingText').textContent='Current season data could not be loaded. Please refresh to try again.';
     $('#seasonLoading').querySelector('.spinner').style.display='none';
   }
