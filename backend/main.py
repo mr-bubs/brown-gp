@@ -31,6 +31,9 @@ app.mount("/F1_Frames", StaticFiles(directory="F1_Frames"), name="frames")
 # Mount shared Brown GP brand assets
 app.mount("/assets", StaticFiles(directory="../assets"), name="assets")
 
+# LANDING-002: separate mobile WebP assets; legacy /F1_Frames remains untouched.
+app.mount("/F1_Webp_LANDING002", StaticFiles(directory="F1_Webp_LANDING002"), name="landing002_frames")
+
 app.add_middleware(
     CORSMiddleware, allow_origins=["*"], allow_credentials=True,
     allow_methods=["*"], allow_headers=["*"],
@@ -586,6 +589,10 @@ async def build_recap_data():
 @app.get("/")
 def read_root():
    with open("landing.html", "r") as f: return HTMLResponse(content=f.read())
+@app.get("/landing-002")
+def read_landing002():
+   with open("landing002.html", "r", encoding="utf-8") as f: return HTMLResponse(content=f.read())
+
 @app.get("/season")
 def read_season():
    with open("season.html", "r", encoding="utf-8") as f: return HTMLResponse(content=f.read())
