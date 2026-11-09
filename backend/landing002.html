@@ -12,112 +12,99 @@
     #dashboard{position:absolute;inset:0;width:100%;height:100%;border:0;background:#08090b}
     #loader{position:fixed;inset:0;z-index:10;background:#08090b;color:white;overflow:hidden;display:flex;align-items:center;justify-content:center;transition:opacity .65s ease,visibility .65s ease}
     #loader.done{opacity:0;visibility:hidden;pointer-events:none}
-    #frames{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none}
+    #frames{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
     #loader::after{content:"";position:absolute;inset:0;background:radial-gradient(ellipse at center,rgba(0,0,0,.08) 15%,rgba(0,0,0,.62) 100%);pointer-events:none}
-    .center{position:relative;z-index:1;display:flex;align-items:center;flex-direction:column;gap:20px;padding:24px;text-align:center}
-    .logo{display:block;width:min(78vw,380px);height:auto;filter:drop-shadow(0 8px 24px rgba(0,0,0,.6))}
+    .center{position:absolute;top:max(26px,env(safe-area-inset-top));left:0;right:0;z-index:2;display:flex;align-items:center;flex-direction:column;gap:10px;padding:16px;text-align:center}
+    .logo{display:block;width:min(65vw,300px);height:auto;filter:drop-shadow(0 8px 24px rgba(0,0,0,.6))}
     .label{font:600 12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;letter-spacing:.28em;color:#e4e4e4;text-shadow:0 2px 10px #000;animation:pulse 1.5s ease-in-out infinite}
     .error{display:none;max-width:320px;font:14px/1.5 system-ui,sans-serif;color:#e6e6e6}
     .error a{color:#fff;text-decoration:underline}
     #loader.failed .error{display:block}
     #loader.failed .label{display:none}
     @keyframes pulse{50%{opacity:.45}}
-    @media(max-width:767px){#frames{display:block}}
+    .dashboard-link{color:#fff;text-decoration:none;font:600 12px/1.5 ui-monospace,monospace;letter-spacing:.18em;text-shadow:0 2px 10px #000;padding:8px 12px}\n    .dashboard-link:focus-visible{outline:2px solid #fff;outline-offset:4px}\n    #scrollHint{position:absolute;bottom:max(30px,env(safe-area-inset-bottom));left:0;right:0;z-index:2;text-align:center;color:white;font:600 12px/1.7 ui-monospace,monospace;letter-spacing:.2em;text-shadow:0 2px 12px #000;display:none;pointer-events:none}\n    #scrollHint.visible{display:block}\n    #loader{touch-action:none}
     @media(prefers-reduced-motion:reduce){.label{animation:none}#loader{transition:none}}
   </style>
 </head>
 <body>
-  <!-- Loading the existing dashboard in parallel preserves its current API and error handling. -->
-  <iframe id="dashboard" src="/season" title="Brown GP Season Dashboard"></iframe>
-  <div id="loader" role="status" aria-live="polite">
-    <img id="frames" alt="" aria-hidden="true">
+  <!-- Keep the existing dashboard intact; navigation is explicit only. -->
+  <iframe id="dashboard" src="/season" title="Brown GP Season Dashboard" tabindex="-1"></iframe>
+  <div id="loader">
+    <img id="frames" alt="Brown GP cinematic explosion frame">
     <div class="center">
-      <img class="logo" src="/assets/browngp-logo.png" alt="Brown GP">
-      <div class="label" id="loadingLabel">LOADING DATA</div>
-      <div class="error">Season data could not be loaded. <a href="/season">Open Season Dashboard</a> or try again later.</div>
+      <a href="/season" aria-label="Go to Brown GP Dashboard"><img class="logo" src="/assets/browngp-logo.png" alt="Brown GP"></a>
+      <a class="dashboard-link" href="/season">GO TO DASHBOARD</a>
+      <div class="label" id="loadingLabel">LOADING FRAMES · 0 / 101</div>
     </div>
+    <div id="scrollHint" aria-live="polite">SCROLL TO EXPLODE<br>↓</div>
   </div>
   <script>
     (function(){
       'use strict';
-      const loader=document.getElementById('loader');
-      const dashboard=document.getElementById('dashboard');
+      const COUNT=101;
       const frameEl=document.getElementById('frames');
       const label=document.getElementById('loadingLabel');
-      const mobile=matchMedia('(max-width:767px)').matches;
-      const COUNT=101;
-      const FRAME_MS=1000/16;
+      const hint=document.getElementById('scrollHint');
+      const loader=document.getElementById('loader');
       const frameUrl=i=>'/F1_Webp_LANDING002/frame_'+String(i).padStart(3,'0')+'_delay-0.2s.webp';
-      let dashboardReady=false, dashboardFailed=false, animationDone=!mobile, dismissed=false;
-      const frames=[];
-      const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
-      function dismiss(){
-        if(dismissed)return;
-        dismissed=true;
-        loader.classList.add('done');
-        setTimeout(()=>{frameEl.removeAttribute('src');frames.forEach(url=>URL.revokeObjectURL(url));loader.remove();},700);
+      const frames=new Array(COUNT);
+      let index=0,ready=false,touchY=null,scrollAccumulator=0;
+      function show(i){
+        if(!ready)return;
+        index=Math.max(0,Math.min(COUNT-1,i));
+        frameEl.src=frames[index].src;
       }
-      function finishIfReady(){
-        if(dashboardFailed){loader.classList.add('failed');return;}
-        if(dashboardReady&&animationDone)dismiss();
-      }
-      function checkDashboard(){
-        if(dismissed||dashboardReady||dashboardFailed)return;
-        try{
-          const doc=dashboard.contentDocument;
-          if(doc){
-            const main=doc.getElementById('seasonMain');
-            const loading=doc.getElementById('seasonLoading');
-            if(main&&!main.hidden){dashboardReady=true;finishIfReady();return;}
-            if(loading&&loading.textContent.includes('Current season data could not be loaded')){
-              dashboardFailed=true;finishIfReady();return;
-            }
-          }
-        }catch(e){}
-        setTimeout(checkDashboard,150);
-      }
-      dashboard.addEventListener('error',()=>{dashboardFailed=true;finishIfReady();});
-      checkDashboard();
-      async function loadFrame(i){
-        const response=await fetch(frameUrl(i),{cache:'force-cache'});
-        if(!response.ok)throw new Error('Frame '+i+' HTTP '+response.status);
-        const blob=await response.blob();
-        return URL.createObjectURL(blob);
-      }
-      function showFrame(url){
+      function load(i){
         return new Promise((resolve,reject)=>{
           const image=new Image();
-          image.onload=()=>{frameEl.src=url;resolve();};
-          image.onerror=()=>reject(new Error('Unable to decode animation frame'));
-          image.src=url;
+          image.onload=()=>resolve(image);
+          image.onerror=()=>reject(new Error('Frame '+i+' failed to load'));
+          image.src=frameUrl(i);
         });
       }
-      async function run(){
-        if(!mobile){finishIfReady();return;}
+      async function prepare(){
         try{
-          // Stream frames in order. Display each one as soon as it is downloaded
-          // and decoded, without waiting for the remaining frames.
+          // Show frame zero as soon as it is available, then retain it in view.
           for(let i=0;i<COUNT;i++){
-            const start=performance.now();
-            const url=await loadFrame(i);
-            frames.push(url);
-            await showFrame(url);
-            label.textContent='LOADING DATA · '+(i+1)+' / '+COUNT;
-            // Allow a real paint opportunity and a minimum 16 FPS frame interval.
-            await wait(Math.max(0,FRAME_MS-(performance.now()-start)));
+            frames[i]=await load(i);
+            if(i===0)frameEl.src=frames[0].src;
+            label.textContent='LOADING FRAMES · '+(i+1)+' / '+COUNT;
           }
-          animationDone=true;
-          label.textContent='LOADING DATA';
-          finishIfReady();
+          ready=true;
+          label.style.display='none';
+          hint.classList.add('visible');
         }catch(error){
-          console.error('LANDING-002 frame loading failed:',error);
-          // Preserve the existing error fallback; never trap a visitor.
-          animationDone=true;
-          label.textContent='LOADING DATA';
-          finishIfReady();
+          console.error('LANDING-002 image preload:',error);
+          label.textContent='ANIMATION UNAVAILABLE';
         }
       }
-      run();
+      function advance(delta){
+        if(!ready)return;
+        scrollAccumulator+=delta;
+        const steps=Math.trunc(scrollAccumulator/14);
+        if(steps){
+          scrollAccumulator-=steps*14;
+          show(index+steps);
+        }
+      }
+      loader.addEventListener('wheel',event=>{
+        if(!ready)return;
+        event.preventDefault();
+        advance(event.deltaY);
+      },{passive:false});
+      loader.addEventListener('touchstart',event=>{
+        if(event.touches.length===1)touchY=event.touches[0].clientY;
+      },{passive:true});
+      loader.addEventListener('touchmove',event=>{
+        if(touchY===null||!ready)return;
+        const y=event.touches[0].clientY;
+        advance((touchY-y)*2);
+        touchY=y;
+        event.preventDefault();
+      },{passive:false});
+      loader.addEventListener('touchend',()=>{touchY=null;});
+      loader.addEventListener('touchcancel',()=>{touchY=null;});
+      prepare();
     })();
   </script>
 </body>
