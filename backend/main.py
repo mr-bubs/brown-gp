@@ -588,7 +588,7 @@ async def build_recap_data():
 
 @app.get("/")
 def read_root():
-   with open("landing.html", "r") as f: return HTMLResponse(content=f.read())
+   with open("landing002.html", "r", encoding="utf-8") as f: return HTMLResponse(content=f.read())
 # LANDING-002 PNG assets stored beside this backend source.
 @app.get("/landing-002/car-portrait")
 def landing002_car_portrait():
