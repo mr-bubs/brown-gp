@@ -14,7 +14,7 @@ import base64
 import warnings
 from urllib.parse import quote
 from fastapi import FastAPI, WebSocket
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import uvicorn
@@ -589,6 +589,15 @@ async def build_recap_data():
 @app.get("/")
 def read_root():
    with open("landing.html", "r") as f: return HTMLResponse(content=f.read())
+# LANDING-002 PNG assets stored beside this backend source.
+@app.get("/landing-002/car-portrait")
+def landing002_car_portrait():
+   return FileResponse("browngp-9x16.png", media_type="image/png")
+
+@app.get("/landing-002/car-landscape")
+def landing002_car_landscape():
+   return FileResponse("browngp-4x3.png", media_type="image/png")
+
 @app.get("/landing-002")
 def read_landing002():
    with open("landing002.html", "r", encoding="utf-8") as f: return HTMLResponse(content=f.read())
