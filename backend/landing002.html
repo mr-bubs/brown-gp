@@ -3,115 +3,86 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#08090b">
-  <title>Brown GP — Season</title>
+  <meta name="theme-color" content="#000000">
+  <title>Brown GP — Season Dashboard</title>
   <link rel="icon" href="/assets/bgp-favicon.png" type="image/png">
   <style>
     *{box-sizing:border-box}
-    html,body{margin:0;width:100%;height:100%;background:#08090b;overflow:hidden}
-    #dashboard{position:absolute;inset:0;width:100%;height:100%;border:0;background:#08090b}
-    #loader{position:fixed;inset:0;z-index:10;background:#08090b;color:white;overflow:hidden;display:flex;align-items:center;justify-content:center;transition:opacity .65s ease,visibility .65s ease}
-    #loader.done{opacity:0;visibility:hidden;pointer-events:none}
-    #frames{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
-    #loader::after{content:"";position:absolute;inset:0;background:radial-gradient(ellipse at center,rgba(0,0,0,.08) 15%,rgba(0,0,0,.62) 100%);pointer-events:none}
-    .center{position:absolute;top:max(26px,env(safe-area-inset-top));left:0;right:0;z-index:2;display:flex;align-items:center;flex-direction:column;gap:10px;padding:16px;text-align:center}
-    .logo{display:block;width:min(65vw,300px);height:auto;filter:drop-shadow(0 8px 24px rgba(0,0,0,.6))}
-    .label{font:600 12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;letter-spacing:.28em;color:#e4e4e4;text-shadow:0 2px 10px #000;animation:pulse 1.5s ease-in-out infinite}
-    .error{display:none;max-width:320px;font:14px/1.5 system-ui,sans-serif;color:#e6e6e6}
-    .error a{color:#fff;text-decoration:underline}
-    #loader.failed .error{display:block}
-    #loader.failed .label{display:none}
-    @keyframes pulse{50%{opacity:.45}}
-    .center > a:first-child{display:block;line-height:0}
-    .dashboard-link{margin-top:-48px;position:relative;z-index:3;color:#fff;text-decoration:none;font:600 12px/1.5 ui-monospace,monospace;letter-spacing:.18em;text-shadow:0 2px 10px #000;padding:8px 12px}
-    .dashboard-link:focus-visible{outline:2px solid #fff;outline-offset:4px}
-    #scrollHint{position:fixed;bottom:max(38px,env(safe-area-inset-bottom));left:0;right:0;z-index:2;text-align:center;color:white;font:600 12px/1.7 ui-monospace,monospace;letter-spacing:.2em;text-shadow:0 2px 12px #000;display:none;pointer-events:none}
-    #scrollHint.visible{display:block}
-    #loader{touch-action:none}
-    @media(prefers-reduced-motion:reduce){.label{animation:none}#loader{transition:none}}
+    html,body{margin:0;width:100%;height:100%;background:#000}
+    #dashboard{position:fixed;inset:0;width:100%;height:100%;border:0;background:#08090b;opacity:0;transition:opacity .8s ease}
+    #dashboard.visible{opacity:1}
+    #intro{position:fixed;inset:0;z-index:2;background:#000;overflow:hidden}
+    #car{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity 1.1s ease}
+    #car.visible{opacity:1}
+    #car.dissolve{opacity:0}
+    #brand{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .85s ease}
+    #brand.visible{opacity:1}
+    #brand img{width:min(78vw,440px);height:auto;filter:drop-shadow(0 5px 22px rgba(0,0,0,.5))}
+    #fallback{position:absolute;left:16px;right:16px;bottom:32px;text-align:center;display:none;color:#fff;font:14px/1.6 system-ui,sans-serif}
+    #fallback a{color:#fff}
+    @media(prefers-reduced-motion:reduce){#car,#brand,#dashboard{transition-duration:.15s}}
   </style>
 </head>
 <body>
-  <!-- Keep the existing dashboard intact; navigation is explicit only. -->
-  <iframe id="dashboard" src="/season" title="Brown GP Season Dashboard" tabindex="-1"></iframe>
-  <div id="loader">
-    <img id="frames" alt="Brown GP cinematic explosion frame">
-    <div class="center">
-      <a href="/season" aria-label="Go to Brown GP Dashboard"><img class="logo" src="/assets/browngp-logo.png" alt="Brown GP"></a>
-      <a class="dashboard-link" href="/season">GO TO DASHBOARD</a>
-      <div class="label" id="loadingLabel">LOADING 0%</div>
-    </div>
-    <div id="scrollHint" aria-live="polite">SCROLL TO EXPLODE<br>↓</div>
+  <!-- The unchanged Season Dashboard loads in parallel; the browser URL stays here. -->
+  <iframe id="dashboard" src="/season" title="Brown GP Season Dashboard"></iframe>
+  <div id="intro" aria-label="Brown GP opening sequence">
+    <picture>
+      <source media="(orientation:landscape)" srcset="/landing-002/car-landscape">
+      <img id="car" src="/landing-002/car-portrait" alt="Brown GP Formula racing car">
+    </picture>
+    <div id="brand"><img src="/assets/browngp-logo.png" alt="Brown GP"></div>
+    <div id="fallback">Season Dashboard is taking longer than expected. <a href="/season">Open it directly</a>.</div>
   </div>
   <script>
     (function(){
       'use strict';
-      const COUNT=101;
-      const frameEl=document.getElementById('frames');
-      const label=document.getElementById('loadingLabel');
-      const hint=document.getElementById('scrollHint');
-      const loader=document.getElementById('loader');
-      const frameUrl=i=>'/F1_Webp_LANDING002/frame_'+String(i).padStart(3,'0')+'_delay-0.2s.webp';
-      const frames=new Array(COUNT);
-      let index=0,ready=false,touchY=null,scrollAccumulator=0;
-      function show(i){
-        if(!ready)return;
-        index=Math.max(0,Math.min(COUNT-1,i));
-        frameEl.src=frames[index].src;
-      }
-      function load(i){
-        return new Promise((resolve,reject)=>{
-          const image=new Image();
-          image.onload=()=>resolve(image);
-          image.onerror=()=>reject(new Error('Frame '+i+' failed to load'));
-          image.src=frameUrl(i);
-        });
-      }
-      async function prepare(){
+      const car=document.getElementById('car');
+      const brand=document.getElementById('brand');
+      const intro=document.getElementById('intro');
+      const dashboard=document.getElementById('dashboard');
+      const fallback=document.getElementById('fallback');
+      const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+      let dashboardReady=false,sequenceDone=false,revealed=false;
+      function checkDashboard(){
+        if(revealed||dashboardReady)return;
         try{
-          // Show frame zero as soon as it is available, then retain it in view.
-          for(let i=0;i<COUNT;i++){
-            frames[i]=await load(i);
-            if(i===0)frameEl.src=frames[0].src;
-            label.textContent='LOADING '+Math.round((i+1)*100/COUNT)+'%';
+          const doc=dashboard.contentDocument;
+          if(doc){
+            const main=doc.getElementById('seasonMain');
+            if(main&&!main.hidden){dashboardReady=true;reveal();return;}
           }
-          ready=true;
-          label.style.display='none';
-          hint.classList.add('visible');
-        }catch(error){
-          console.error('LANDING-002 image preload:',error);
-          label.textContent='ANIMATION UNAVAILABLE';
-          hint.textContent='SCROLL UNAVAILABLE';
-          hint.classList.add('visible');
+        }catch(e){}
+        setTimeout(checkDashboard,200);
+      }
+      function reveal(){
+        if(!dashboardReady||!sequenceDone||revealed)return;
+        revealed=true;
+        dashboard.classList.add('visible');
+        setTimeout(()=>intro.remove(),850);
+      }
+      async function showIntro(){
+        try{
+          if(!car.complete)await Promise.race([
+            new Promise(resolve=>{car.addEventListener('load',resolve,{once:true});car.addEventListener('error',resolve,{once:true});}),
+            wait(10000)
+          ]);
+          if(car.naturalWidth)car.classList.add('visible');
+          await wait(1600);
+          car.classList.add('dissolve');
+          await wait(1200);
+          brand.classList.add('visible');
+          await wait(1300);
+          brand.classList.remove('visible');
+          await wait(900);
+        }finally{
+          sequenceDone=true;
+          reveal();
         }
       }
-      function advance(delta){
-        if(!ready)return;
-        scrollAccumulator+=delta;
-        const steps=Math.trunc(scrollAccumulator/14);
-        if(steps){
-          scrollAccumulator-=steps*14;
-          show(index+steps);
-        }
-      }
-      loader.addEventListener('wheel',event=>{
-        if(!ready)return;
-        event.preventDefault();
-        advance(event.deltaY);
-      },{passive:false});
-      loader.addEventListener('touchstart',event=>{
-        if(event.touches.length===1)touchY=event.touches[0].clientY;
-      },{passive:true});
-      loader.addEventListener('touchmove',event=>{
-        if(touchY===null||!ready)return;
-        const y=event.touches[0].clientY;
-        advance((touchY-y)*2);
-        touchY=y;
-        event.preventDefault();
-      },{passive:false});
-      loader.addEventListener('touchend',()=>{touchY=null;});
-      loader.addEventListener('touchcancel',()=>{touchY=null;});
-      prepare();
+      setTimeout(()=>{if(!dashboardReady)fallback.style.display='block';},16000);
+      checkDashboard();
+      showIntro();
     })();
   </script>
 </body>
