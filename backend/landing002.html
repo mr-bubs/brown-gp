@@ -43,66 +43,115 @@
       const loader=document.getElementById('loader');
       const dashboard=document.getElementById('dashboard');
       const frameEl=document.getElementById('frames');
-      const mobile=window.matchMedia('(max-width:767px)').matches;
-      const reduceMotion=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      let finished=false;
-      let frameIndex=0;
-      let current=null;
-      let next=null;
-      let lastAdvance=performance.now();
+      const mobile=matchMedia('(max-width:767px)').matches;
+      const reduceMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
       const frameUrl=i=>'/F1_Webp_LANDING002/frame_'+String(i).padStart(3,'0')+'_delay-0.2s.webp';
-      function preload(i){
-        if(i>100)return null;
-        const im=new Image();
-        im.src=frameUrl(i);
-        return im;
+      const COUNT=101, FPS=16, FAST_MBPS=180, MAX_PRELOAD_MS=12000;
+      const blobs=new Array(COUNT), urls=new Array(COUNT);
+      const controller=new AbortController();
+      let dashboardReady=false, dashboardFailed=false, decisionMade=false, cinematic=false, cinematicDone=false, dismissed=false;
+      let lastFrame=0, started=0;
+      const began=performance.now();
+      const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+      function release(){
+        controller.abort();
+        for(let i=0;i<COUNT;i++){if(urls[i]){URL.revokeObjectURL(urls[i]);urls[i]=null;}blobs[i]=null;}
       }
-      function animate(now){
-        if(finished||!mobile||reduceMotion)return;
-        if(current&&current.complete&&current.naturalWidth){
-          if(frameEl.src!==current.src)frameEl.src=current.src;
-          if(now-lastAdvance>=62.5&&frameIndex<100){
-            if(next&&next.complete&&next.naturalWidth){
-              frameIndex++;
-              current=next;
-              next=preload(frameIndex+1);
-              lastAdvance=now;
-            }
-          }
-        }
-        requestAnimationFrame(animate);
+      function dismiss(){
+        if(dismissed)return;
+        dismissed=true;
+        loader.classList.add('done');
+        setTimeout(()=>{frameEl.removeAttribute('src');release();loader.remove();},700);
       }
-      if(mobile&&!reduceMotion){
-        current=preload(0);
-        next=preload(1);
-        requestAnimationFrame(animate);
+      function revealIfReady(){
+        if(dashboardFailed){loader.classList.add('failed');return;}
+        if(dashboardReady&&decisionMade&&(!cinematic||cinematicDone))dismiss();
       }
       function checkDashboard(){
-        if(finished)return;
+        if(dismissed||dashboardReady||dashboardFailed)return;
         try{
           const doc=dashboard.contentDocument;
-          if(!doc)return;
-          const main=doc.getElementById('seasonMain');
-          const loading=doc.getElementById('seasonLoading');
-          if(main&&!main.hidden){
-            finished=true;
-            loader.classList.add('done');
-            setTimeout(()=>loader.remove(),700);
-            return;
+          if(doc){
+            const main=doc.getElementById('seasonMain');
+            const loading=doc.getElementById('seasonLoading');
+            if(main&&!main.hidden){dashboardReady=true;revealIfReady();return;}
+            if(loading&&loading.textContent.includes('Current season data could not be loaded')){
+              dashboardFailed=true;decisionMade=true;release();revealIfReady();return;
+            }
           }
-          if(loading&&loading.textContent.includes('Current season data could not be loaded')){
-            finished=true;
-            loader.classList.add('failed');
-            return;
-          }
-        }catch(e){/* Keep waiting for same-origin dashboard. */}
+        }catch(e){}
         setTimeout(checkDashboard,150);
       }
-      dashboard.addEventListener('error',()=>{
-        finished=true;
-        loader.classList.add('failed');
-      });
+      dashboard.addEventListener('error',()=>{dashboardFailed=true;decisionMade=true;release();revealIfReady();});
       checkDashboard();
+      async function download(i){
+        const response=await fetch(frameUrl(i),{signal:controller.signal,cache:'force-cache'});
+        if(!response.ok)throw new Error('Frame '+i+' HTTP '+response.status);
+        const blob=await response.blob();
+        blobs[i]=blob;
+        return blob.size;
+      }
+      function show(i){
+        if(!urls[i])urls[i]=URL.createObjectURL(blobs[i]);
+        frameEl.src=urls[i];
+      }
+      async function play(){
+        cinematic=true;
+        decisionMade=true;
+        revealIfReady();
+        started=performance.now();
+        function tick(now){
+          if(dismissed||dashboardFailed)return;
+          const index=Math.min(COUNT-1,Math.floor((now-started)*FPS/1000));
+          if(index!==lastFrame){lastFrame=index;show(index);}
+          if(index===COUNT-1&&now-started>=COUNT*1000/FPS){
+            cinematicDone=true;
+            revealIfReady();
+            return;
+          }
+          requestAnimationFrame(tick);
+        }
+        show(0);
+        requestAnimationFrame(tick);
+      }
+      async function run(){
+        if(!mobile||reduceMotion){decisionMade=true;revealIfReady();return;}
+        try{
+          // First frames are the connection probe, not an unrelated speed-test download.
+          const sampleStart=performance.now();
+          let sampleBytes=0;
+          for(let i=0;i<3;i++){
+            sampleBytes+=await download(i);
+            if(i===0)show(0);
+            if(performance.now()-began>4000)break;
+          }
+          const elapsed=(performance.now()-sampleStart)/1000;
+          const mbps=sampleBytes*8/Math.max(elapsed,.001)/1e6;
+          if(mbps<FAST_MBPS||blobs.slice(0,3).some(x=>!x)){
+            decisionMade=true;revealIfReady();return;
+          }
+          // A fast link gets a complete cinematic, provided the buffer finishes
+          // within a strict time budget. Never block a slower or unstable visitor.
+          let cursor=3, failed=false;
+          const worker=async()=>{
+            while(!failed&&!dashboardFailed&&performance.now()-began<MAX_PRELOAD_MS){
+              const i=cursor++;
+              if(i>=COUNT)return;
+              try{await download(i);}catch(e){failed=true;return;}
+            }
+          };
+          await Promise.all(Array.from({length:8},worker));
+          if(failed||dashboardFailed||blobs.some(x=>!x)){
+            decisionMade=true;revealIfReady();return;
+          }
+          await play();
+        }catch(e){
+          decisionMade=true;revealIfReady();
+        }
+      }
+      // Even if a network request hangs, the loader will not hold ready data indefinitely.
+      setTimeout(()=>{if(!decisionMade){decisionMade=true;revealIfReady();}},MAX_PRELOAD_MS+1000);
+      run();
     })();
   </script>
 </body>
