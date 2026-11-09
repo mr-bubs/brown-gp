@@ -627,6 +627,97 @@ async def _fetch_remote_json(session, url: str) -> dict:
     except Exception:
         return {}
 
+# Generated season-result cache, independent of FastF1 and replay caches.
+# Cache files are runtime data; do not commit season_cache/ to Git.
+SEASON_CACHE_DIR = "season_cache"
+SEASON_CACHE_TTL = 900  # 15 minutes; completed rounds remain usable during outages.
+_season_cache_lock = asyncio.Lock()
+
+def _season_cache_read(key):
+    path = os.path.join(SEASON_CACHE_DIR, key + ".json")
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            record = json.load(handle)
+        if isinstance(record, dict) and isinstance(record.get("payload"), dict):
+            return record
+    except (OSError, ValueError, TypeError):
+        pass
+    return None
+
+def _season_cache_write(key, payload):
+    os.makedirs(SEASON_CACHE_DIR, exist_ok=True)
+    path = os.path.join(SEASON_CACHE_DIR, key + ".json")
+    temporary = path + "." + str(time.time_ns()) + ".tmp"
+    try:
+        with open(temporary, "w", encoding="utf-8") as handle:
+            json.dump({"saved_at": time.time(), "payload": payload}, handle)
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.remove(temporary)
+
+async def _season_cached(key, fetcher):
+    record = _season_cache_read(key)
+    if record and time.time() - record.get("saved_at", 0) < SEASON_CACHE_TTL:
+        return record["payload"]
+    async with _season_cache_lock:
+        record = _season_cache_read(key)
+        if record and time.time() - record.get("saved_at", 0) < SEASON_CACHE_TTL:
+            return record["payload"]
+        try:
+            payload = await fetcher()
+            if not isinstance(payload, dict) or not payload.get("MRData", {}).get("RaceTable", {}).get("Races"):
+                raise ValueError("Empty season result response")
+            await asyncio.to_thread(_season_cache_write, key, payload)
+            return payload
+        except Exception as exc:
+            print(f"[SEASON CACHE] {key}: {exc}")
+            if record:
+                return record["payload"]
+            return {"MRData": {"RaceTable": {"Races": []}}}
+
+async def _season_all_results(http_session, kind):
+    # Jolpica caps result records per page. Aggregate every offset into
+    # complete per-round race objects before passing data to the existing UI.
+    base = f"https://api.jolpi.ca/ergast/f1/current/{kind}.json"
+    first = await _fetch_remote_json(http_session, base + "?limit=100&offset=0")
+    meta = first.get("MRData", {})
+    table = meta.get("RaceTable", {})
+    if not isinstance(table.get("Races"), list):
+        raise ValueError("Jolpica first page unavailable")
+    total = int(meta.get("total", 0))
+    limit = int(meta.get("limit", 100))
+    if limit < 1 or total < 1:
+        raise ValueError("Jolpica pagination metadata unavailable")
+    offsets = range(limit, total, limit)
+    pages = await asyncio.gather(*[
+        _fetch_remote_json(http_session, base + f"?limit=100&offset={offset}")
+        for offset in offsets
+    ])
+    by_round = {}
+    field = "Results" if kind == "results" else "SprintResults"
+    for page in [first, *pages]:
+        races = page.get("MRData", {}).get("RaceTable", {}).get("Races")
+        if not isinstance(races, list):
+            raise ValueError("Jolpica result page unavailable")
+        for race in races:
+            round_key = str(race.get("round", ""))
+            if not round_key:
+                continue
+            if round_key not in by_round:
+                by_round[round_key] = dict(race)
+                by_round[round_key][field] = []
+            by_round[round_key][field].extend(race.get(field, []))
+    if sum(len(r.get(field, [])) for r in by_round.values()) < total:
+        raise ValueError("Incomplete Jolpica result pagination")
+    merged = dict(first)
+    merged["MRData"] = dict(meta)
+    merged["MRData"]["RaceTable"] = dict(table)
+    merged["MRData"]["RaceTable"]["Races"] = sorted(
+        by_round.values(), key=lambda race: int(race["round"])
+    )
+    return merged
+
 @app.get("/api/season-data")
 async def get_season_data():
     urls = {
@@ -634,13 +725,17 @@ async def get_season_data():
         "constructors": "https://api.jolpi.ca/ergast/f1/current/constructorStandings.json",
         "schedule": "https://api.jolpi.ca/ergast/f1/current.json?limit=100",
         "headshots": "https://api.openf1.org/v1/drivers?session_key=latest",
-        "results": "https://api.jolpi.ca/ergast/f1/current/results.json?limit=2000",
-        "sprints": "https://api.jolpi.ca/ergast/f1/current/sprint.json?limit=1000",
     }
-    timeout = aiohttp.ClientTimeout(total=25)
-    async with aiohttp.ClientSession(timeout=timeout) as session:
-        payloads = await asyncio.gather(*[_fetch_remote_json(session, url) for url in urls.values()])
-    return JSONResponse(dict(zip(urls.keys(), payloads)))
+    timeout = aiohttp.ClientTimeout(total=30)
+    async with aiohttp.ClientSession(timeout=timeout) as http_session:
+        async def history(kind):
+            return await _season_cached(
+                "2026_" + kind,
+                lambda: _season_all_results(http_session, kind)
+            )
+        tasks = [_fetch_remote_json(http_session, url) for url in urls.values()]
+        payloads = await asyncio.gather(*tasks, history("results"), history("sprint"))
+    return JSONResponse(dict(zip([*urls.keys(), "results", "sprints"], payloads)))
 
 def _season_alpha_items(payload):
     if isinstance(payload, list):
@@ -765,21 +860,41 @@ async def get_season_results(round: int, session: str = "results"):
     allowed = {"results", "qualifying", "sprint", "sprintQualifying"}
     if session not in allowed:
         return JSONResponse({"MRData": {"RaceTable": {"Races": []}}}, status_code=400)
-    timeout = aiohttp.ClientTimeout(total=20)
+    timeout = aiohttp.ClientTimeout(total=30)
     async with aiohttp.ClientSession(timeout=timeout) as http_session:
+        if session in ("results", "sprint"):
+            history_kind = "results" if session == "results" else "sprint"
+            history = await _season_cached(
+                "2026_" + history_kind,
+                lambda: _season_all_results(http_session, history_kind)
+            )
+            meta = history.get("MRData", {})
+            table = meta.get("RaceTable", {})
+            selected = [race for race in table.get("Races", []) if str(race.get("round")) == str(round)]
+            response = {"MRData": dict(meta)}
+            response["MRData"]["RaceTable"] = dict(table)
+            response["MRData"]["RaceTable"]["Races"] = selected
+            return JSONResponse(response)
         if session == "sprintQualifying":
-            schedule = await _fetch_remote_json(
-                http_session, "https://api.jolpi.ca/f1/alpha/schedules/2026/"
+            async def fetch_sprint_qualifying():
+                schedule = await _fetch_remote_json(
+                    http_session, "https://api.jolpi.ca/f1/alpha/schedules/2026/"
+                )
+                round_id = _season_alpha_round_id(schedule, round)
+                if not round_id:
+                    return {"MRData": {"RaceTable": {"Races": []}}}
+                payload = await _fetch_remote_json(
+                    http_session, f"https://api.jolpi.ca/f1/alpha/results/{round_id}/SQ/"
+                )
+                return _season_alpha_sprint_quali_to_ergast(payload, round)
+            payload = await _season_cached(
+                f"2026_round_{round}_sprintQualifying", fetch_sprint_qualifying
             )
-            round_id = _season_alpha_round_id(schedule, round)
-            if not round_id:
-                return JSONResponse({"MRData": {"RaceTable": {"Races": []}}})
-            payload = await _fetch_remote_json(
-                http_session, f"https://api.jolpi.ca/f1/alpha/results/{round_id}/SQ/"
-            )
-            return JSONResponse(_season_alpha_sprint_quali_to_ergast(payload, round))
-        url = f"https://api.jolpi.ca/ergast/f1/current/{round}/{session}.json?limit=100"
-        payload = await _fetch_remote_json(http_session, url)
+            return JSONResponse(payload)
+        async def fetch_qualifying():
+            url = f"https://api.jolpi.ca/ergast/f1/current/{round}/qualifying.json?limit=100"
+            return await _fetch_remote_json(http_session, url)
+        payload = await _season_cached(f"2026_round_{round}_qualifying", fetch_qualifying)
     return JSONResponse(payload)
 
 @app.get("/api/track-map")
