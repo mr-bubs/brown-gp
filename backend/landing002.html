@@ -182,6 +182,14 @@ const fallbackDrivers=[
 const fallbackConstructors=[['1','503','10','mercedes','Mercedes'],['2','358','2','ferrari','Ferrari'],['3','306','2','mclaren','McLaren'],['4','230','0','red_bull','Red Bull'],['5','77','0','rb','RB F1 Team'],['6','68','0','alpine','Alpine'],['7','21','0','haas','Haas'],['8','17','0','audi','Audi'],['9','11','0','williams','Williams'],['10','3','0','aston_martin','Aston Martin'],['11','0','0','cadillac','Cadillac']].map(x=>({position:x[0],points:x[1],wins:x[2],Constructor:{constructorId:x[3],name:x[4]}}));
 const S={drivers:[],constructors:[],headshots:{},schedule:[],history:{drivers:[],constructors:[]},mode:'drivers',table:'drivers',round:0,session:'results'};
 const O={drivers:[],constructors:[],history:{drivers:[],constructors:[]},headshots:{},mode:'drivers',table:'drivers'};
+// Audited OpenF1 portrait asset paths (2024/2025); missing drivers keep initials.
+// These are image URLs, not guarantees of season-specific uniforms.
+const historicalPortraitPaths={"2024":{"VER":"M/MAXVER01_Max_Verstappen/maxver01","NOR":"L/LANNOR01_Lando_Norris/lannor01","GAS":"P/PIEGAS01_Pierre_Gasly/piegas01","PER":"S/SERPER01_Sergio_Perez/serper01","ALO":"F/FERALO01_Fernando_Alonso/feralo01","LEC":"C/CHALEC01_Charles_Leclerc/chalec01","STR":"L/LANSTR01_Lance_Stroll/lanstr01","MAG":"K/KEVMAG01_Kevin_Magnussen/kevmag01","TSU":"Y/YUKTSU01_Yuki_Tsunoda/yuktsu01","ALB":"A/ALEALB01_Alexander_Albon/alealb01","ZHO":"G/GUAZHO01_Guanyu_Zhou/guazho01","HUL":"N/NICHUL01_Nico_Hulkenberg/nichul01","HAM":"L/LEWHAM01_Lewis_Hamilton/lewham01","SAI":"C/CARSAI01_Carlos_Sainz/carsai01","RUS":"G/GEORUS01_George_Russell/georus01","BOT":"V/VALBOT01_Valtteri_Bottas/valbot01","PIA":"O/OSCPIA01_Oscar_Piastri/oscpia01","OCO":"E/ESTOCO01_Esteban_Ocon/estoco01","RIC":"D/DANRIC01_Daniel_Ricciardo/danric01","SAR":"L/LOGSAR01_Logan_Sargeant/logsar01"},"2025":{"VER":"M/MAXVER01_Max_Verstappen/maxver01","NOR":"L/LANNOR01_Lando_Norris/lannor01","BOR":"G/GABBOR01_Gabriel_Bortoleto/gabbor01","HAD":"I/ISAHAD01_Isack_Hadjar/isahad01","GAS":"P/PIEGAS01_Pierre_Gasly/piegas01","ANT":"A/ANDANT01_Andrea%20Kimi_Antonelli/andant01","ALO":"F/FERALO01_Fernando_Alonso/feralo01","LEC":"C/CHALEC01_Charles_Leclerc/chalec01","STR":"L/LANSTR01_Lance_Stroll/lanstr01","TSU":"Y/YUKTSU01_Yuki_Tsunoda/yuktsu01","ALB":"A/ALEALB01_Alexander_Albon/alealb01","HUL":"N/NICHUL01_Nico_Hulkenberg/nichul01","LAW":"L/LIALAW01_Liam_Lawson/lialaw01","OCO":"E/ESTOCO01_Esteban_Ocon/estoco01","HAM":"L/LEWHAM01_Lewis_Hamilton/lewham01","SAI":"C/CARSAI01_Carlos_Sainz/carsai01","RUS":"G/GEORUS01_George_Russell/georus01","PIA":"O/OSCPIA01_Oscar_Piastri/oscpia01","BEA":"O/OLIBEA01_Oliver_Bearman/olibea01","DOO":"J/JACDOO01_Jack_Doohan/jacdoo01"}};
+function historicalHeadshots(year){
+  const paths=historicalPortraitPaths[year]||{},headshots={};
+  for(const [code,path] of Object.entries(paths))headshots[code]={headshot_url:'https://media.formula1.com/d_driver_fallback_image.png/content/dam/fom-website/drivers/'+path+'.png.transform/1col/image.png'};
+  return headshots;
+}
 let currentOverview=null,overviewRequest=0;
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const esc=s=>String(s??'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#039;'}[c]));
@@ -256,7 +264,7 @@ async function selectOverviewYear(year){
       const constructors=response.constructors?.MRData?.StandingsTable?.StandingsLists?.[0]?.ConstructorStandings;
       const races=normalizeSchedule(response.results),schedule=normalizeSchedule(response.schedule);
       if(!drivers?.length||!constructors?.length||!races.length||races.length!==schedule.length)throw new Error('Incomplete historical data');
-      bundle={drivers,constructors,headshots:{},results:response.results,sprints:response.sprints,round:schedule.length,schedule};
+      bundle={drivers,constructors,headshots:historicalHeadshots(year),results:response.results,sprints:response.sprints,round:schedule.length,schedule};
     }
     if(request!==overviewRequest)return;
     O.drivers=bundle.drivers;O.constructors=bundle.constructors;O.headshots=bundle.headshots;
