@@ -281,7 +281,7 @@ async function selectOverviewYear(year){
 }
 function closeOverviewYears(){const menu=$('#overviewYears');menu.hidden=true;$('#overviewNav').setAttribute('aria-expanded','false')}
 $('#overviewNav').addEventListener('click',()=>{const menu=$('#overviewYears');menu.hidden=!menu.hidden;if(!menu.hidden){const r=$('#overviewNav').getBoundingClientRect();menu.style.left=Math.max(8,Math.min(r.left,window.innerWidth-220))+'px';menu.style.top=Math.min(r.bottom+8,window.innerHeight-195)+'px'}$('#overviewNav').setAttribute('aria-expanded',String(!menu.hidden))});
-$('[data-overview-year]').forEach(b=>b.addEventListener('click',()=>{closeOverviewYears();selectOverviewYear(b.dataset.overviewYear)}));
+$$('[data-overview-year]').forEach(b=>b.addEventListener('click',()=>{closeOverviewYears();selectOverviewYear(b.dataset.overviewYear)}));
 document.addEventListener('click',e=>{if(!e.target.closest('.overview-nav-wrap'))closeOverviewYears()});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeOverviewYears()});
 hydrate();
