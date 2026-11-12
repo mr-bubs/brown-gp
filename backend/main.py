@@ -676,10 +676,10 @@ async def _season_cached(key, fetcher):
                 return record["payload"]
             return {"MRData": {"RaceTable": {"Races": []}}}
 
-async def _season_all_results(http_session, kind):
+async def _season_all_results(http_session, kind, year="current"):
     # Jolpica caps result records per page. Aggregate every offset into
     # complete per-round race objects before passing data to the existing UI.
-    base = f"https://api.jolpi.ca/ergast/f1/current/{kind}.json"
+    base = f"https://api.jolpi.ca/ergast/f1/{year}/{kind}.json"
     first = await _fetch_remote_json(http_session, base + "?limit=100&offset=0")
     meta = first.get("MRData", {})
     table = meta.get("RaceTable", {})
@@ -736,6 +736,61 @@ async def get_season_data():
         tasks = [_fetch_remote_json(http_session, url) for url in urls.values()]
         payloads = await asyncio.gather(*tasks, history("results"), history("sprint"))
     return JSONResponse(dict(zip([*urls.keys(), "results", "sprints"], payloads)))
+
+# LANDING-003: historical Overview only. Current-season Results/Calendar APIs stay unchanged.
+# Historical JSON is small generated data and remains outside Git source control.
+_HISTORICAL_OVERVIEW_YEARS = (2024, 2025)
+
+def _historical_overview_valid(payload):
+    if not isinstance(payload, dict):
+        return False
+    for kind in ("drivers", "constructors"):
+        standings = (payload.get(kind) or {}).get("MRData", {}).get("StandingsTable", {}).get("StandingsLists", [])
+        if not standings or not standings[0].get("DriverStandings" if kind == "drivers" else "ConstructorStandings"):
+            return False
+    races = (payload.get("schedule") or {}).get("MRData", {}).get("RaceTable", {}).get("Races", [])
+    results = (payload.get("results") or {}).get("MRData", {}).get("RaceTable", {}).get("Races", [])
+    return bool(races and results and len(results) == len(races))
+
+async def _historical_overview_bundle(year):
+    prefix = f"https://api.jolpi.ca/ergast/f1/{year}"
+    timeout = aiohttp.ClientTimeout(total=60)
+    async with aiohttp.ClientSession(timeout=timeout) as session:
+        urls = {
+            "drivers": f"{prefix}/driverStandings.json",
+            "constructors": f"{prefix}/constructorStandings.json",
+            "schedule": f"{prefix}.json?limit=100",
+        }
+        async def all_results(kind):
+            return await _season_all_results(session, kind, year=year)
+        keys = list(urls)
+        responses = await asyncio.gather(
+            *[_fetch_remote_json(session, urls[key]) for key in keys],
+            all_results("results"), all_results("sprint")
+        )
+        return dict(zip([*keys, "results", "sprints"], responses))
+
+@app.get("/api/season-overview/{year}")
+async def get_historical_overview_data(year: int):
+    if year not in _HISTORICAL_OVERVIEW_YEARS:
+        return JSONResponse({"error": "Historical Overview supports 2024 and 2025 only"}, status_code=400)
+    key = f"overview_{year}_v1"
+    record = _season_cache_read(key)
+    if record and _historical_overview_valid(record.get("payload")):
+        return JSONResponse(record["payload"])
+    async with _season_cache_lock:
+        record = _season_cache_read(key)
+        if record and _historical_overview_valid(record.get("payload")):
+            return JSONResponse(record["payload"])
+        try:
+            payload = await _historical_overview_bundle(year)
+            if not _historical_overview_valid(payload):
+                raise ValueError("Historical overview response incomplete")
+            await asyncio.to_thread(_season_cache_write, key, payload)
+            return JSONResponse(payload)
+        except Exception as exc:
+            print(f"[HISTORICAL OVERVIEW] {year}: {exc}")
+            return JSONResponse({"error": "Historical season temporarily unavailable"}, status_code=503)
 
 def _season_alpha_items(payload):
     if isinstance(payload, list):
