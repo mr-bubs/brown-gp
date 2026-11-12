@@ -27,7 +27,11 @@
     .overview-year-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 18px;color:var(--text)}
     .overview-year-bar select{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:9px 14px;font:inherit}
     .overview-year-bar label{font-weight:700}.overview-year-bar #overviewYearStatus{color:var(--muted);font-size:.85rem}
-  </style>
+  
+    /* Historical Overview has no upcoming-race hero; retain the current-season layout. */
+    #overview[data-overview-year="2024"] .race-hero,#overview[data-overview-year="2025"] .race-hero{display:none}
+    #overview[data-overview-year="2024"] .hero,#overview[data-overview-year="2025"] .hero{grid-template-columns:minmax(0,1fr)}
+</style>
 
   <style>
     /* Landing cinematic overlay; season dashboard styles remain unchanged. */
@@ -258,14 +262,8 @@ async function selectOverviewYear(year){
     O.drivers=bundle.drivers;O.constructors=bundle.constructors;O.headshots=bundle.headshots;
     $('#roundCount').textContent=bundle.round;
     renderLeaders();renderStandings();buildHistory(normalizeSchedule(bundle.results),normalizeSchedule(bundle.sprints));
-    if(year!=='2026'){
-      const finale=bundle.schedule[bundle.schedule.length-1];
-      $('#raceRound').textContent=year+' · SEASON FINALE';
-      $('#nextRaceTitle').textContent=finale.raceName;
-      $('#racePlace').textContent=finale.Circuit.circuitName+' · '+finale.Circuit.Location.locality;
-      $('#countdown').innerHTML='<div class="count-unit"><b>FINAL</b><span>Classification</span></div>';
-      updateTrackMap(finale);
-    }else{
+    $('#overview').dataset.overviewYear=year;
+    if(year==='2026'){
       const next=S.schedule.find(r=>new Date(r.date+'T23:59:00Z')>=new Date());
       if(next)setNextRace(next);
     }
