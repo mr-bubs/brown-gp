@@ -25,7 +25,7 @@
     .nav::-webkit-scrollbar{display:none}.nav button{flex:0 0 auto;white-space:nowrap}.sync{margin-left:auto}.hero{margin-top:2px}.race-hero{min-height:330px;padding:23px}.race-copy{max-width:100%}.track{width:70%;right:-50px;top:80px;opacity:.13}.race-title{font-size:2.7rem;max-width:75%}.calendar{grid-template-columns:1fr}.card{padding:18px}.standing{padding:9px 12px}.result-row{grid-template-columns:42px 1fr 80px;padding:12px}.result-row .status{display:none}.result-row.header{display:none}.session-tabs{width:100%;overflow:auto;flex-wrap:nowrap}.session-tabs button{white-space:nowrap}.chart-wrap{margin-left:-10px}.year{display:none}footer{display:block}.podium{height:230px}}
   
     .overview-nav-wrap{position:relative;display:inline-flex;flex:none}
-    .overview-years{position:absolute;z-index:80;top:calc(100% + 8px);left:0;min-width:195px;background:#202122;border:1px solid #6b6053;border-radius:13px;padding:6px;box-shadow:0 12px 35px #000a}
+    .overview-years{position:fixed;z-index:80;min-width:195px;background:#202122;border:1px solid #6b6053;border-radius:13px;padding:6px;box-shadow:0 12px 35px #000a}
     .overview-years[hidden]{display:none}
     .nav .overview-years button{display:block;width:100%;text-align:left;white-space:nowrap;color:#f1e5d3;padding:12px 14px}
     .nav .overview-years button[aria-current="true"]{background:#d6b58a;color:#0b0c0c}
@@ -280,7 +280,7 @@ async function selectOverviewYear(year){
   }
 }
 function closeOverviewYears(){const menu=$('#overviewYears');menu.hidden=true;$('#overviewNav').setAttribute('aria-expanded','false')}
-$('#overviewNav').addEventListener('click',()=>{const menu=$('#overviewYears');menu.hidden=!menu.hidden;$('#overviewNav').setAttribute('aria-expanded',String(!menu.hidden))});
+$('#overviewNav').addEventListener('click',()=>{const menu=$('#overviewYears');menu.hidden=!menu.hidden;if(!menu.hidden){const r=$('#overviewNav').getBoundingClientRect();menu.style.left=Math.max(8,Math.min(r.left,window.innerWidth-220))+'px';menu.style.top=Math.min(r.bottom+8,window.innerHeight-195)+'px'}$('#overviewNav').setAttribute('aria-expanded',String(!menu.hidden))});
 $('[data-overview-year]').forEach(b=>b.addEventListener('click',()=>{closeOverviewYears();selectOverviewYear(b.dataset.overviewYear)}));
 document.addEventListener('click',e=>{if(!e.target.closest('.overview-nav-wrap'))closeOverviewYears()});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeOverviewYears()});
