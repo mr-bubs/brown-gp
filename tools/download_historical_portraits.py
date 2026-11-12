@@ -2,7 +2,7 @@
 """Download season-labelled portraits from Brown GP's existing OpenF1 audits.
 
 Does not modify Brown GP source, Git, or running backend.
-Input: ~/brown-gp/portrait_audit/portraits_{2024,2025}_audit.json
+Input: 2024/2025 audit JSON plus localhost:10000/api/season-data for 2026
 Output: ~/brown-gp/portrait_audit/driver_portraits/{year}/{year}_{CODE}.png
 """
 import json
@@ -16,6 +16,29 @@ ROOT = Path.home() / "brown-gp" / "portrait_audit"
 OUTPUT = ROOT / "driver_portraits"
 MAX_BYTES = 8 * 1024 * 1024
 
+LOCAL_SEASON_DATA = "http://127.0.0.1:10000/api/season-data"
+
+def current_season_portraits():
+    """Read the same current-season headshot records used by landing002.html."""
+    req = Request(LOCAL_SEASON_DATA, headers={"Accept": "application/json"})
+    with urlopen(req, timeout=30) as response:
+        bundle = json.load(response)
+    records = bundle.get("headshots", [])
+    if not isinstance(records, list):
+        raise ValueError("2026 headshots were not a list")
+    portraits = {}
+    for record in records:
+        if not isinstance(record, dict):
+            continue
+        code = record.get("name_acronym")
+        url = record.get("headshot_url")
+        if isinstance(code, str) and re.fullmatch(r"[A-Z]{3}", code) and isinstance(url, str):
+            portraits[code] = {"headshot_url": url}
+    if not portraits:
+        raise ValueError("No 2026 portrait URLs returned by local backend")
+    return portraits
+
+
 def is_image(data):
     return (data.startswith(bytes.fromhex("89504e470d0a1a0a")) or
             data.startswith(bytes.fromhex("ffd8ff")) or
@@ -23,17 +46,27 @@ def is_image(data):
 
 def main():
     report = {"saved": [], "already_present": [], "failed": [], "missing": {}}
-    for year in (2024, 2025):
-        audit_path = ROOT / f"portraits_{year}_audit.json"
-        if not audit_path.is_file():
-            print(f"Missing audit: {audit_path}")
-            report["failed"].append({"year": year, "reason": "audit file missing"})
-            continue
-        audit = json.loads(audit_path.read_text(encoding="utf-8"))
-        if audit.get("season") != year:
-            raise ValueError(f"Unexpected season in {audit_path}")
-        portraits = audit.get("portraits", {})
-        report["missing"][str(year)] = audit.get("missing_drivers", {})
+    for year in (2024, 2025, 2026):
+        if year == 2026:
+            try:
+                portraits = current_season_portraits()
+            except (HTTPError, URLError, TimeoutError, ValueError, OSError) as exc:
+                print(f"2026: could not read local season headshots: {exc}", flush=True)
+                report["failed"].append({"year": year, "reason": str(exc)})
+                continue
+            report["missing"][str(year)] = {}
+            print(f"2026: {len(portraits)} headshot URLs from local backend", flush=True)
+        else:
+            audit_path = ROOT / f"portraits_{year}_audit.json"
+            if not audit_path.is_file():
+                print(f"Missing audit: {audit_path}")
+                report["failed"].append({"year": year, "reason": "audit file missing"})
+                continue
+            audit = json.loads(audit_path.read_text(encoding="utf-8"))
+            if audit.get("season") != year:
+                raise ValueError(f"Unexpected season in {audit_path}")
+            portraits = audit.get("portraits", {})
+            report["missing"][str(year)] = audit.get("missing_drivers", {})
         dest_dir = OUTPUT / str(year)
         dest_dir.mkdir(parents=True, exist_ok=True)
         for code, record in sorted(portraits.items()):
@@ -45,7 +78,7 @@ def main():
                 print(f"EXISTS {dest.name}", flush=True)
                 report["already_present"].append(str(dest.relative_to(OUTPUT)))
                 continue
-            if not url.startswith("https://media.formula1.com/"):
+            if not isinstance(url, str) or not url.startswith("https://media.formula1.com/"):
                 report["failed"].append({"year": year, "code": code, "reason": "unexpected URL host"})
                 continue
             try:
