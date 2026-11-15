@@ -36,10 +36,10 @@
   <style>
     /* Landing cinematic overlay; season dashboard styles remain unchanged. */
     #bgp-intro{position:fixed;inset:0;z-index:9999;background:#000;overflow:hidden}
-    #bgp-car{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity 1.1s ease}
+    #bgp-car{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .85s ease}
     #bgp-car.visible{opacity:1}
     #bgp-car.dissolve{opacity:0}
-    #bgp-brand{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .85s ease}
+    #bgp-brand{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity 1.1s ease}
     #bgp-brand.visible{opacity:1}
     #bgp-brand img{width:min(78vw,440px);height:auto;filter:drop-shadow(0 5px 22px rgba(0,0,0,.5))}
     @media(prefers-reduced-motion:reduce){#bgp-car,#bgp-brand{transition-duration:.15s}}
@@ -122,13 +122,13 @@
         }),
         wait(8000)
       ]);
-      if(car.naturalWidth)car.classList.add('visible');
-      await wait(reduced?200:1600);
-      car.classList.add('dissolve');
-      await wait(reduced?200:1200);
       brand.classList.add('visible');
-      await wait(reduced?200:1300);
+      await wait(reduced?200:1600);
       brand.classList.remove('visible');
+      await wait(reduced?200:1200);
+      if(car.naturalWidth)car.classList.add('visible');
+      await wait(reduced?200:1300);
+      car.classList.add('dissolve');
       await wait(reduced?200:900);
     }finally{
       // The dashboard is already in this document, including its loading/error state.
