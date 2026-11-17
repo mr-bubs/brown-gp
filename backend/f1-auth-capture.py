@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import sys
 import threading
 import time
@@ -51,6 +52,57 @@ HEADERS = {
 
 def now_iso():
     return datetime.now(timezone.utc).isoformat()
+
+
+def slugify(value):
+    value = str(value or "").strip().lower()
+    value = re.sub(r"[^a-z0-9]+", "-", value)
+    return value.strip("-")
+
+
+def build_final_capture_path(session_info):
+    if not isinstance(session_info, dict):
+        return None
+
+    meeting = session_info.get("Meeting")
+    if not isinstance(meeting, dict):
+        meeting = {}
+
+    event_name = (
+        meeting.get("Name")
+        or meeting.get("Location")
+        or (meeting.get("Circuit") or {}).get("ShortName")
+    )
+    session_name = session_info.get("Name") or session_info.get("Type")
+    start_date = session_info.get("StartDate")
+
+    event_slug = slugify(event_name)
+    session_slug = slugify(session_name)
+
+    try:
+        date_slug = datetime.fromisoformat(
+            str(start_date).replace("Z", "+00:00")
+        ).date().isoformat()
+    except Exception:
+        date_slug = datetime.now().date().isoformat()
+
+    if not event_slug:
+        return None
+
+    parts = ["capture", event_slug]
+    if session_slug:
+        parts.append(session_slug)
+    parts.append(date_slug)
+
+    base = os.path.join(CAPTURE_DIR, "-".join(parts) + ".jsonl")
+    if not os.path.exists(base):
+        return base
+
+    stem, ext = os.path.splitext(base)
+    suffix = 2
+    while os.path.exists(f"{stem}-{suffix}{ext}"):
+        suffix += 1
+    return f"{stem}-{suffix}{ext}"
 
 
 def load_access_token():
@@ -161,6 +213,7 @@ def main():
 
     counts = {}
     attempt = 0
+    latest_session_info = None
 
     writer.write({
         "record_type": "event",
@@ -224,6 +277,8 @@ def main():
                     print(f"[ERROR]        {error}")
 
                 def on_feed(message):
+                    nonlocal latest_session_info
+
                     try:
                         received_at = now_iso()
 
@@ -237,6 +292,11 @@ def main():
                             extra = None
 
                         counts[feed] = counts.get(feed, 0) + 1
+
+                        if feed == "SessionInfo" and isinstance(content, dict):
+                            if latest_session_info is None:
+                                latest_session_info = {}
+                            latest_session_info.update(content)
 
                         writer.write({
                             "record_type": "feed",
