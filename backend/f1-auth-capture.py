@@ -5,6 +5,7 @@ import sys
 import threading
 import time
 import urllib.parse
+from collections import deque
 from datetime import datetime, timezone
 
 import requests
@@ -16,6 +17,8 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 CAPTURE_DIR = os.path.join(SCRIPT_DIR, "f1-captures")
 RECONNECT_DELAY = 5
 FSYNC_INTERVAL = 2.0
+PRE_ROLL_SECONDS = 30
+TOKEN_CHECK_INTERVAL = 5
 
 NEGOTIATE_URL = "https://livetiming.formula1.com/signalrcore/negotiate"
 WS_URL = "wss://livetiming.formula1.com/signalrcore"
@@ -103,6 +106,11 @@ def build_final_capture_path(session_info):
     while os.path.exists(f"{stem}-{suffix}{ext}"):
         suffix += 1
     return f"{stem}-{suffix}{ext}"
+
+
+def token_signature():
+    stat = os.stat(TOKEN_FILE)
+    return (stat.st_mtime_ns, stat.st_size)
 
 
 def load_access_token():
@@ -202,32 +210,142 @@ def get_aws_cookie():
 def main():
     os.makedirs(CAPTURE_DIR, exist_ok=True)
 
-    stamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    capture_path = os.path.join(
-        CAPTURE_DIR,
-        f"f1-auth-capture_{stamp}.jsonl",
-    )
+    state_lock = threading.RLock()
+    pre_roll = deque()
 
-    access_token = load_access_token()
-    writer = JsonlWriter(capture_path)
+    session_writer = None
+    session_capture_path = None
+    session_counts = {}
+    session_info = {}
+    observed_session_info = {}
 
-    counts = {}
     attempt = 0
-    latest_session_info = None
 
-    writer.write({
-        "record_type": "event",
-        "event": "recorder_started",
-        "received_at": now_iso(),
-        "authenticated": True,
-    })
+    def merge_session_info(current, update):
+        if not isinstance(update, dict):
+            return current
+
+        if update.get("_kf") is True:
+            return dict(update)
+
+        merged = dict(current or {})
+        merged.update(update)
+        return merged
+
+    def trim_pre_roll(now_monotonic):
+        cutoff = now_monotonic - PRE_ROLL_SECONDS
+        while pre_roll and pre_roll[0][0] < cutoff:
+            pre_roll.popleft()
+
+    def write_session_record(record):
+        nonlocal session_counts
+
+        if session_writer is None:
+            return
+
+        session_writer.write(record)
+
+        if record.get("record_type") == "feed":
+            feed = str(record.get("feed", "unknown"))
+            session_counts[feed] = session_counts.get(feed, 0) + 1
+
+    def start_session_capture(info):
+        nonlocal session_writer
+        nonlocal session_capture_path
+        nonlocal session_counts
+        nonlocal session_info
+
+        with state_lock:
+            if session_writer is not None:
+                return
+
+            stamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            session_capture_path = os.path.join(
+                CAPTURE_DIR,
+                f"capture-in-progress_{stamp}.jsonl",
+            )
+            session_writer = JsonlWriter(session_capture_path)
+            session_counts = {}
+            session_info = dict(info or {})
+
+            buffered = [record for _when, record in pre_roll]
+            pre_roll.clear()
+
+            for record in buffered:
+                write_session_record(record)
+
+            write_session_record({
+                "record_type": "event",
+                "event": "session_capture_started",
+                "received_at": now_iso(),
+                "authenticated": True,
+                "pre_roll_seconds": PRE_ROLL_SECONDS,
+            })
+
+            meeting = session_info.get("Meeting") or {}
+            event_name = meeting.get("Name") or meeting.get("Location") or "Unknown event"
+            session_name = session_info.get("Name") or session_info.get("Type") or "Unknown session"
+
+            print("=" * 72)
+            print(f"[SESSION START] {event_name} — {session_name}")
+            print(f"[CAPTURE]       {session_capture_path}")
+            print("=" * 72)
+
+    def finalize_session_capture(reason):
+        nonlocal session_writer
+        nonlocal session_capture_path
+        nonlocal session_counts
+        nonlocal session_info
+
+        with state_lock:
+            if session_writer is None:
+                return
+
+            write_session_record({
+                "record_type": "event",
+                "event": "session_capture_finished",
+                "received_at": now_iso(),
+                "reason": reason,
+                "counts": dict(session_counts),
+            })
+
+            session_writer.close()
+
+            old_path = session_capture_path
+            final_path = build_final_capture_path(session_info)
+
+            if final_path and final_path != old_path:
+                try:
+                    os.replace(old_path, final_path)
+                except Exception as exc:
+                    print(f"[RENAME WARN]   Could not rename capture: {exc}")
+                    final_path = old_path
+            else:
+                final_path = old_path
+
+            print("\n[SESSION SAVED]")
+            for name, count in sorted(
+                session_counts.items(),
+                key=lambda item: item[1],
+                reverse=True,
+            ):
+                print(f"  {name:<24} {count}")
+            print(f"  File: {final_path}\n")
+            print("[WAITING]       Recorder still running for the next session")
+
+            session_writer = None
+            session_capture_path = None
+            session_counts = {}
+            session_info = {}
 
     print("=" * 72)
-    print("BROWN GP — AUTHENTICATED F1 AUTO-RECONNECT CAPTURE")
+    print("BROWN GP — AUTHENTICATED F1 WEEKEND CAPTURE")
     print("=" * 72)
-    print(f"[CAPTURE]     {capture_path}")
-    print("[TOKEN]       Loaded securely ✓ (never printed or written)")
-    print(f"[RECONNECT]   {RECONNECT_DELAY} second delay")
+    print("[MODE]         One long-running process, one file per live session")
+    print(f"[PRE-ROLL]     {PRE_ROLL_SECONDS}s")
+    print(f"[RECONNECT]    {RECONNECT_DELAY}s after ordinary disconnects")
+    print("[TOKEN]        File is monitored; replacement triggers re-authentication")
+    print("[WAITING]      Waiting for SessionInfo.SessionStatus = Started")
     print("=" * 72)
 
     try:
@@ -235,8 +353,12 @@ def main():
             attempt += 1
             disconnected = threading.Event()
             hub = None
+            token_refresh_requested = False
 
             try:
+                access_token = load_access_token()
+                connected_token_signature = token_signature()
+
                 print(f"[CONNECT]      Attempt #{attempt}")
                 headers = get_aws_cookie()
 
@@ -255,29 +377,43 @@ def main():
 
                 def on_open(*_args):
                     print(f"[WEBSOCKET]    CONNECTED ✓ (attempt #{attempt})")
-                    writer.write({
-                        "record_type": "event",
-                        "event": "connected",
-                        "received_at": now_iso(),
-                        "attempt": attempt,
-                    })
+                    with state_lock:
+                        if session_writer is not None:
+                            write_session_record({
+                                "record_type": "event",
+                                "event": "connected",
+                                "received_at": now_iso(),
+                                "attempt": attempt,
+                            })
 
                 def on_close(*args):
                     print("[WEBSOCKET]    Connection closed")
-                    writer.write({
-                        "record_type": "event",
-                        "event": "disconnected",
-                        "received_at": now_iso(),
-                        "attempt": attempt,
-                        "detail": str(args) if args else None,
-                    })
+                    with state_lock:
+                        if session_writer is not None:
+                            write_session_record({
+                                "record_type": "event",
+                                "event": "disconnected",
+                                "received_at": now_iso(),
+                                "attempt": attempt,
+                                "detail": str(args) if args else None,
+                            })
                     disconnected.set()
 
                 def on_error(error):
                     print(f"[ERROR]        {error}")
+                    with state_lock:
+                        if session_writer is not None:
+                            write_session_record({
+                                "record_type": "event",
+                                "event": "connection_error",
+                                "received_at": now_iso(),
+                                "attempt": attempt,
+                                "error": str(error),
+                            })
 
                 def on_feed(message):
-                    nonlocal latest_session_info
+                    nonlocal observed_session_info
+                    nonlocal session_info
 
                     try:
                         received_at = now_iso()
@@ -291,20 +427,13 @@ def main():
                             content = message
                             extra = None
 
-                        counts[feed] = counts.get(feed, 0) + 1
-
-                        if feed == "SessionInfo" and isinstance(content, dict):
-                            if latest_session_info is None:
-                                latest_session_info = {}
-                            latest_session_info.update(content)
-
-                        writer.write({
+                        record = {
                             "record_type": "feed",
                             "received_at": received_at,
                             "feed": feed,
                             "data": content,
                             "extra": extra,
-                        })
+                        }
 
                         marker = ""
                         if feed == "CarData.z":
@@ -312,10 +441,49 @@ def main():
                         elif feed == "Position.z":
                             marker = "  <<< POSITION"
 
-                        print(
-                            f"[FEED]         {feed:<24} "
-                            f"#{counts[feed]}{marker}"
-                        )
+                        with state_lock:
+                            if feed == "SessionInfo" and isinstance(content, dict):
+                                observed_session_info = merge_session_info(
+                                    observed_session_info,
+                                    content,
+                                )
+
+                                if session_writer is not None:
+                                    session_info = merge_session_info(
+                                        session_info,
+                                        content,
+                                    )
+
+                            if session_writer is None:
+                                now_mono = time.monotonic()
+                                pre_roll.append((now_mono, record))
+                                trim_pre_roll(now_mono)
+
+                                status = observed_session_info.get("SessionStatus")
+                                if status == "Started":
+                                    start_session_capture(observed_session_info)
+
+                                    feed_count = session_counts.get(feed, 0)
+                                    print(
+                                        f"[FEED]         {feed:<24} "
+                                        f"#{feed_count}{marker}"
+                                    )
+                                return
+
+                            write_session_record(record)
+                            feed_count = session_counts.get(feed, 0)
+                            print(
+                                f"[FEED]         {feed:<24} "
+                                f"#{feed_count}{marker}"
+                            )
+
+                            if (
+                                feed == "SessionInfo"
+                                and isinstance(content, dict)
+                                and session_info.get("SessionStatus") == "Finalised"
+                            ):
+                                finalize_session_capture("SessionStatus Finalised")
+                                observed_session_info = dict(session_info)
 
                     except Exception as exc:
                         print(f"[WRITE ERROR]  {exc}")
@@ -330,30 +498,48 @@ def main():
 
                 print(f"[SUBSCRIBE]     Requesting {len(TOPICS)} feeds...")
                 hub.send("Subscribe", [TOPICS])
+                print("[LISTENING]     Connected; waiting/capturing automatically")
 
-                writer.write({
-                    "record_type": "event",
-                    "event": "subscription_sent",
-                    "received_at": now_iso(),
-                    "attempt": attempt,
-                    "feeds": TOPICS,
-                })
-
-                print("[RECORDING]     Listening + saving authenticated F1 data")
+                next_token_check = time.monotonic() + TOKEN_CHECK_INTERVAL
 
                 while not disconnected.wait(1):
-                    pass
+                    now_mono = time.monotonic()
+                    if now_mono < next_token_check:
+                        continue
+
+                    next_token_check = now_mono + TOKEN_CHECK_INTERVAL
+
+                    try:
+                        current_signature = token_signature()
+                    except Exception as exc:
+                        print(f"[TOKEN WARN]   Could not stat token file: {exc}")
+                        continue
+
+                    if current_signature != connected_token_signature:
+                        print("[TOKEN]        Token file changed — reconnecting with new token")
+                        with state_lock:
+                            if session_writer is not None:
+                                write_session_record({
+                                    "record_type": "event",
+                                    "event": "token_file_changed",
+                                    "received_at": now_iso(),
+                                })
+                        token_refresh_requested = True
+                        disconnected.set()
+                        break
 
             except Exception as exc:
                 print(f"[DISCONNECTED]  {type(exc).__name__}: {exc}")
-                writer.write({
-                    "record_type": "event",
-                    "event": "connection_error",
-                    "received_at": now_iso(),
-                    "attempt": attempt,
-                    "error_type": type(exc).__name__,
-                    "error": str(exc),
-                })
+                with state_lock:
+                    if session_writer is not None:
+                        write_session_record({
+                            "record_type": "event",
+                            "event": "connection_error",
+                            "received_at": now_iso(),
+                            "attempt": attempt,
+                            "error_type": type(exc).__name__,
+                            "error": str(exc),
+                        })
 
             finally:
                 if hub is not None:
@@ -362,30 +548,22 @@ def main():
                     except Exception:
                         pass
 
+            if token_refresh_requested:
+                print("[RECONNECT]     Re-authenticating now...")
+                continue
+
             print(f"[RECONNECT]     Trying again in {RECONNECT_DELAY}s...")
             time.sleep(RECONNECT_DELAY)
 
     except KeyboardInterrupt:
-        print("\n[STOP]         Recorder stopped by user")
-        writer.write({
-            "record_type": "event",
-            "event": "recorder_stopped",
-            "received_at": now_iso(),
-            "counts": counts,
-        })
+        print("\n[STOP]         Weekend recorder stopped by user")
+        with state_lock:
+            if session_writer is not None:
+                finalize_session_capture("recorder stopped by user")
+            else:
+                print("[STOP]         No active session file was open")
 
-    finally:
-        writer.close()
 
-        print("\nFeed totals:")
-        for name, count in sorted(
-            counts.items(),
-            key=lambda item: item[1],
-            reverse=True,
-        ):
-            print(f"  {name:<24} {count}")
-
-        print(f"\nSaved to: {capture_path}")
 
 
 if __name__ == "__main__":
