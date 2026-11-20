@@ -330,7 +330,24 @@ async def shutdown():
 
 def read_html():
     with open(SESSION_HTML, 'r', encoding='utf-8') as f:
-        return f.read()
+        html = f.read()
+
+    # Test-server-only presentation fallback. Keep SessionInfo genuinely empty
+    # until F1 supplies it; do not alter the production index.html on disk.
+    original = """        document.getElementById('session-name').innerHTML = '<span style="color:var(--text-dim); font-size:14px;">AWAITING F1 TELEMETRY...</span>';
+        document.getElementById('live-badge-ui').style.display = 'none';
+        return;"""
+    replacement = """        document.getElementById('session-name').innerHTML = '<span style="color:var(--text-dim); font-size:14px;">SESSION INFO PENDING</span>';
+        document.getElementById('live-badge-ui').style.display = 'flex';
+        document.getElementById('offline-banner').style.display = 'none';
+        document.getElementById('standard-wrap').style.display = 'block';
+        document.getElementById('dashboard-wrap').style.display = 'none';
+        document.getElementById('session-clock').innerText = '--:--';
+        renderLiveTable();
+        return;"""
+    if html.count(original) != 1:
+        raise RuntimeError('Expected empty-SessionInfo guard not found in index.html')
+    return html.replace(original, replacement)
 
 
 @app.get('/')
