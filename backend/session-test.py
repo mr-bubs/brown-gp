@@ -60,6 +60,8 @@ connection_status = {
     'connected': False, 'subscribed': False, 'attempts': 0,
     'feeds_received': 0, 'last_feed': None, 'last_feed_at': None,
     'last_error': None,
+    'feed_counts': {}, 'session_info_seen': False,
+    'session_info_last_shape': None, 'session_info_last_keys': [],
 }
 
 
@@ -224,6 +226,18 @@ def signalr_worker():
                         connection_status['feeds_received'] += 1
                         connection_status['last_feed'] = feed
                         connection_status['last_feed_at'] = received_at
+                        counts = connection_status['feed_counts']
+                        counts[feed] = counts.get(feed, 0) + 1
+                        if feed == 'SessionInfo':
+                            connection_status['session_info_seen'] = True
+                            connection_status['session_info_last_shape'] = type(content).__name__
+                            connection_status['session_info_last_keys'] = (
+                                list(content.keys()) if isinstance(content, dict) else []
+                            )
+                            print('[SESSION TEST] SessionInfo received: type=%s, keys=%s' % (
+                                type(content).__name__,
+                                connection_status['session_info_last_keys'],
+                            ))
                     if event_loop is not None and feed_queue is not None:
                         event_loop.call_soon_threadsafe(
                             feed_queue.put_nowait, (feed, content)
